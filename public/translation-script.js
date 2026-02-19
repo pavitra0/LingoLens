@@ -465,6 +465,111 @@
             return;
         }
 
+        if (event.data.type === 'REQUEST_PAGE_STATE') {
+            const translations = {};
+            translatedTexts.forEach((value, key) => {
+                const target = getElementByUniqueId(key);
+                translations[key] = {
+                    original: originalTexts.get(key) || (target ? target.innerText : ''),
+                    translated: value,
+                    elementTag: target ? target.tagName.toLowerCase() : 'unknown',
+                    isLocked: target ? target.dataset.lingoLocked === 'true' : false,
+                    status: target && target.dataset.lingoModified === 'true' ? 'modified' : 'active',
+                    timestamp: Date.now()
+                };
+            });
+
+            window.parent.postMessage({
+                type: 'PAGE_STATE_RESPONSE',
+                payload: {
+                    translations,
+                    title: document.title
+                }
+            }, '*');
+            return;
+        }
+
+        if (event.data.type === 'RESTORE_PAGE_STATE') {
+            const { translations } = event.data;
+            if (!translations) return;
+
+            console.log('[Lingo] Restoring page state:', Object.keys(translations).length, 'items');
+
+            Object.entries(translations).forEach(([id, entry]) => {
+                // Handle both old (string) and new (object) formats
+                const text = typeof entry === 'string' ? entry : entry.translated;
+                const isLocked = typeof entry === 'object' ? entry.isLocked : false;
+
+                const target = getElementByUniqueId(id);
+                if (target) {
+                    // Save original state if not already saved
+                    if (!originalTexts.has(id)) {
+                        originalTexts.set(id, target.innerText);
+                        originalDimensions.set(id, {
+                            width: target.offsetWidth,
+                            height: target.offsetHeight,
+                            scrollWidth: target.scrollWidth,
+                            scrollHeight: target.scrollHeight
+                        });
+                    }
+
+                    translatedTexts.set(id, text);
+                    target.innerText = text;
+                    target.dataset.lingoState = 'translated';
+                    target.classList.add('lingo-translated');
+
+                    if (isLocked) {
+                        target.dataset.lingoLocked = 'true';
+                        target.style.outline = '2px dashed #f59e0b'; // Visual indicator for locked
+                    }
+                }
+            });
+            return;
+        }
+
+        if (event.data.type === 'HIGHLIGHT_ELEMENT') {
+            const { id } = event.data;
+            const target = getElementByUniqueId(id);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Flash effect
+                const originalTransition = target.style.transition;
+                const originalBg = target.style.backgroundColor;
+
+                target.style.transition = 'background-color 0.5s ease';
+                target.style.backgroundColor = 'rgba(255, 255, 0, 0.5)'; // Yellow highlight
+
+                setTimeout(() => {
+                    target.style.backgroundColor = originalBg;
+                    setTimeout(() => {
+                        target.style.transition = originalTransition;
+                    }, 500);
+                }, 1500);
+            }
+            return;
+        }
+
+        if (event.data.type === 'UPDATE_TRANSLATION') {
+            const { id, text, isLocked } = event.data;
+            const target = getElementByUniqueId(id);
+            if (target) {
+                translatedTexts.set(id, text);
+                target.innerText = text;
+
+                if (isLocked !== undefined) {
+                    target.dataset.lingoLocked = isLocked ? 'true' : 'false';
+                    if (isLocked) {
+                        target.style.outline = '2px dashed #f59e0b';
+                    } else {
+                        target.style.outline = '';
+                    }
+                }
+
+                target.dataset.lingoModified = 'true';
+            }
+            return;
+        }
+
         if (event.data.type !== 'TRANSLATION_RESULT') return;
 
         const { id, translatedText, success } = event.data;
@@ -512,5 +617,201 @@
             }
         }
     });
+
+
+
+    // Explanation Logic
+    let explainButton = null;
+    let selectionTimeout = null;
+
+    function createExplainButton() {
+        if (explainButton) return;
+        explainButton = document.createElement('div');
+        explainButton.className = 'lingo-explain-btn';
+        explainButton.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                <path d="M12 2a10 10 0 0 1 10 10"></path>
+                <path d="M12 12 2.1 12"></path>
+            </svg>
+            Explain
+        `;
+        explainButton.style.cssText = `
+            position: fixed;
+            z-index: 2147483647;
+            background: #4f46e5;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 99px;
+            cursor: pointer;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+            display: none;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: auto;
+            transform-origin: center bottom;
+        `;
+
+        explainButton.onmousedown = (e) => {
+            e.preventDefault(); // Prevent clearing selection
+            e.stopPropagation();
+        };
+
+        explainButton.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+
+            if (selectedText) {
+                console.log('[Lingo] Explain requested for:', selectedText.substring(0, 20));
+
+                // Get context
+                const anchorNode = selection.anchorNode;
+                let context = "";
+                if (anchorNode) {
+                    const parentBlock = anchorNode.parentElement?.closest('p, div, h1, h2, h3, h4, h5, h6, li, article, section');
+                    context = parentBlock ? parentBlock.innerText.substring(0, 800) : (anchorNode.parentElement?.innerText || "");
+                }
+
+                window.parent.postMessage({
+                    type: 'EXPLAIN_REQUEST',
+                    selectedText,
+                    surroundingText: context
+                }, '*');
+            }
+            hideExplainButton();
+            // Clear selection after clicking
+            window.getSelection().removeAllRanges();
+        };
+
+        document.body.appendChild(explainButton);
+    }
+
+    function showExplainButton(rect) {
+        if (!explainButton) createExplainButton();
+
+        // Calculate position (centered above selection)
+        const buttonWidth = 90; // Approx
+        const buttonHeight = 36;
+
+        let top = rect.top - buttonHeight - 10;
+        let left = rect.left + (rect.width / 2) - (buttonWidth / 2);
+
+        // Viewport checks
+        if (top < 10) top = rect.bottom + 10; // Show below if too close to top
+        if (left < 10) left = 10;
+        if (left + buttonWidth > window.innerWidth) left = window.innerWidth - buttonWidth - 10;
+
+        explainButton.style.top = `${top}px`;
+        explainButton.style.left = `${left}px`;
+        explainButton.style.display = 'flex';
+
+        // Animate in
+        explainButton.style.opacity = '0';
+        explainButton.style.transform = 'translateY(5px) scale(0.9)';
+
+        requestAnimationFrame(() => {
+            explainButton.style.opacity = '1';
+            explainButton.style.transform = 'translateY(0) scale(1)';
+        });
+    }
+
+    function hideExplainButton() {
+        if (explainButton) {
+            explainButton.style.opacity = '0';
+            explainButton.style.transform = 'translateY(5px) scale(0.9)';
+            setTimeout(() => {
+                if (explainButton.style.opacity === '0') {
+                    explainButton.style.display = 'none';
+                }
+            }, 200);
+        }
+    }
+
+    // Trigger on mouseup (end of selection) or keyup (shift+arrow)
+    function checkSelection(e) {
+        // Short timeout to let selection settle
+        setTimeout(() => {
+            const selection = window.getSelection();
+            const text = selection.toString().trim();
+
+            if (text.length > 0 && !selection.isCollapsed) {
+                try {
+                    const range = selection.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+
+                    // Only show if visible and valid size
+                    if (rect.width > 0 && rect.height > 0) {
+                        showExplainButton(rect);
+                    } else {
+                        hideExplainButton();
+                    }
+                } catch (e) {
+                    console.error('Selection rect error:', e);
+                    hideExplainButton();
+                }
+            } else {
+                hideExplainButton();
+            }
+        }, 10);
+    }
+
+    document.addEventListener('mouseup', checkSelection);
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift' || e.key.startsWith('Arrow')) {
+            checkSelection(e);
+        }
+    });
+
+    // Hide on scroll to prevent floating weirdness
+    document.addEventListener('scroll', hideExplainButton, { capture: true, passive: true });
+
+    document.addEventListener('mousedown', (e) => {
+        if (explainButton && e.target !== explainButton && !explainButton.contains(e.target)) {
+            hideExplainButton();
+        }
+    });
+
+    // Ensure button is created on load
+    // Ensure button is created on load
+    createExplainButton();
+
+    // Theme Color Detection
+    function detectThemeColor() {
+        // 1. Check meta tag
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) return metaTheme.content;
+
+        // 2. Check strict header/nav background
+        const header = document.querySelector('header, nav, .header, .nav, [role="banner"]');
+        if (header) {
+            const bg = window.getComputedStyle(header).backgroundColor;
+            if (bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg;
+        }
+
+        // 3. Check body background
+        const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+        if (bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') return bodyBg;
+
+        return null;
+    }
+
+    // Send theme color on load
+    setTimeout(() => {
+        const themeColor = detectThemeColor();
+        if (themeColor) {
+            console.log('[Lingo] Detected theme color:', themeColor);
+            window.parent.postMessage({
+                type: 'THEME_COLOR_DETECTED',
+                color: themeColor
+            }, '*');
+        }
+    }, 1000);
 
 })();

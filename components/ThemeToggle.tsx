@@ -1,9 +1,6 @@
-'use client'
-
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Sun01Icon, Moon01Icon } from '@hugeicons/core-free-icons'
+import { Sun, Moon } from 'lucide-react'
 
 export default function ThemeToggle() {
   const [isDark, setIsDark] = useState(false)
@@ -26,11 +23,13 @@ export default function ThemeToggle() {
       size="icon"
       onClick={toggleTheme}
       aria-label="Toggle theme"
+      className="rounded-full hover:bg-secondary transition-colors"
     >
-      <HugeiconsIcon
-        icon={isDark ? Sun01Icon : Moon01Icon}
-        className="size-5"
-      />
+      {isDark ? (
+        <Sun className="h-5 w-5 transition-all text-yellow-100 hover:text-yellow-200" />
+      ) : (
+        <Moon className="h-5 w-5 transition-all text-slate-700 hover:text-slate-900" />
+      )}
     </Button>
   )
 }
