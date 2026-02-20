@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Globe, Layout, Sparkles } from "lucide-react";
+import { ArrowRight, Globe, Layout, Sparkles, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -21,9 +21,17 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-foreground relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center text-foreground relative overflow-hidden bg-background bg-[url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center before:absolute before:inset-0 before:bg-background/80 dark:before:bg-background/80">
 
-      <main className="w-full max-w-5xl px-6 flex flex-col items-center text-center z-10 space-y-12">
+      {/* Header */}
+      <header className="absolute top-0 w-full p-6 flex justify-end z-20">
+        <Button variant="outline" className="bg-background/50 backdrop-blur-md hover:bg-background/80 shadow-sm border-white/20" onClick={() => router.push('/vocabulary')}>
+          <BookOpen className="w-4 h-4 mr-2 text-primary" />
+          Vocabulary
+        </Button>
+      </header>
+
+      <main className="w-full max-w-5xl px-6 flex flex-col items-center text-center z-10 space-y-12 mt-12">
         {/* Hero Section */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-xs font-medium text-secondary-foreground mb-8 shadow-sm ring-1 ring-white/20">

@@ -17,8 +17,65 @@ export interface SavedPage {
     translations: Record<string, TranslationEntry>;
 }
 
-const STORAGE_KEY = 'lingolens_library';
+export interface VocabularyEntry {
+    id: string; // Add ID for easier deletion
+    original: string;
+    translated: string;
+    explanation: string;
+    url: string;
+    targetLanguage: string;
+    timestamp: number;
+}
 
+const STORAGE_KEY = 'lingolens_library';
+const VOCAB_STORAGE_KEY = 'lingolens_vocabulary';
+
+// --- Vocabulary Storage Logic ---
+export function getVocabularyList(): VocabularyEntry[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const data = localStorage.getItem(VOCAB_STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        console.error("Failed to load vocabulary list", e);
+        return [];
+    }
+}
+
+export function addVocabulary(entry: Omit<VocabularyEntry, 'id' | 'timestamp'>): void {
+    const list = getVocabularyList();
+    const newEntry: VocabularyEntry = {
+        ...entry,
+        id: generateId(),
+        timestamp: Date.now()
+    };
+    list.unshift(newEntry); // Add to beginning
+
+    try {
+        localStorage.setItem(VOCAB_STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+        console.error("Failed to save vocabulary entry", e);
+    }
+}
+
+export function deleteVocabulary(id: string): void {
+    const list = getVocabularyList().filter(v => v.id !== id);
+    try {
+        localStorage.setItem(VOCAB_STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+        console.error("Failed to delete vocabulary entry", e);
+    }
+}
+
+export function clearVocabulary(): void {
+    try {
+        localStorage.removeItem(VOCAB_STORAGE_KEY);
+    } catch (e) {
+        console.error("Failed to clear vocabulary list", e);
+    }
+}
+
+// --- Page Storage Logic ---
 export function getSavedPages(): SavedPage[] {
     if (typeof window === 'undefined') return [];
     try {

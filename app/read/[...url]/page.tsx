@@ -7,9 +7,9 @@ import ThemeToggle from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { reconstructUrl } from '@/lib/utils'
 import TranslationPanel from '@/components/TranslationPanel' // Import component
-import { getSavedPage, savePage, type SavedPage, type TranslationEntry } from '@/lib/library' // Import library types
+import { getSavedPage, savePage, addVocabulary, type SavedPage, type TranslationEntry } from '@/lib/library' // Import library types
 import { explainText } from '@/app/actions/explain' // Import explanation action
-import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, List, PanelsTopLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, List, PanelsTopLeft, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -143,6 +143,28 @@ export default function ReadPage() {
                 success: true
               }, '*');
             }
+
+            // --- Auto-Fetch Explanation ---
+            const pageUrl = reconstructUrl(params.url as string | string[]) || "";
+            // Run asynchronously without blocking the main thread
+            explainText({
+              selectedText: result.data, // Explaining the translated text
+              surroundingText: result.data,
+              pageUrl,
+              pageTitle: document.title
+            }).then(explainResult => {
+              if (explainResult.success && explainResult.explanation) {
+                addVocabulary({
+                  original: text,
+                  translated: result.data!,
+                  explanation: explainResult.explanation,
+                  url: pageUrl,
+                  targetLanguage
+                });
+              }
+            }).catch(e => console.error("Auto-explain failed", e));
+            // -----------------------------
+
           } else {
             // ... error handling
             if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -336,6 +358,34 @@ export default function ReadPage() {
     }
   }
 
+  const handlePanelExplain = async (id: string, text: string) => {
+    setExplanationData({ selectedText: text, surroundingText: text });
+    setExplanationLoading(true);
+    setExplanationResult("");
+
+    const pageTitle = document.title;
+    const pageUrl = reconstructUrl(params.url as string | string[]) || "";
+
+    try {
+      const response = await explainText({
+        selectedText: text,
+        surroundingText: text,
+        pageUrl,
+        pageTitle
+      });
+
+      if (response.success && response.explanation) {
+        setExplanationResult(response.explanation);
+      } else {
+        setExplanationResult(response.error || "Could not generate explanation.");
+      }
+    } catch (e) {
+      setExplanationResult("Error generating explanation.");
+    } finally {
+      setExplanationLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -361,18 +411,18 @@ export default function ReadPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
+    <div className="h-screen flex flex-col overflow-hidden bg-background bg-[url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
       {/* Browser Toolbar */}
       <div
-        className="flex-none bg-secondary/80 backdrop-blur-xl border-b border-border/50 p-1 flex items-center gap-4 transition-all duration-1000 z-50"
+        className="flex-none bg-background/50 dark:bg-background/40 backdrop-blur-2xl border-b border-white/20 dark:border-white/10 p-2 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 md:gap-4 transition-all duration-1000 z-50"
         style={{
-          backgroundColor: dynamicThemeColor ? `${dynamicThemeColor}CC` : undefined, // Add transparency
+          backgroundColor: dynamicThemeColor ? `${dynamicThemeColor}80` : undefined, // Add transparency
           borderColor: dynamicThemeColor ? `${dynamicThemeColor}` : undefined
         }}
       >
 
         {/* Navigation Controls */}
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex items-center gap-1 md:gap-2 text-muted-foreground order-1">
           {/* Magic Wand Batch Translate */}
           <Button
             variant="ghost"
@@ -410,35 +460,43 @@ export default function ReadPage() {
             {isSaved ? <Bookmark className="w-4 h-4 fill-current" /> : <Save className="w-4 h-4" />}
           </Button>
 
-          <div className="w-px h-4 bg-border mx-1" />
+          {/* Vocabulary / Flashcards */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 hover:bg-primary/10 hover:text-primary rounded-full transition-colors"
+            onClick={() => router.push('/vocabulary')}
+            title="Vocabulary List"
+          >
+            <BookOpen className="w-4 h-4" />
+          </Button>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => router.back()}>
+          <div className="hidden md:block w-px h-4 bg-border mx-1" />
+
+          <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => router.back()}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background/50 rounded-full" disabled>
+          <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" disabled>
             <ArrowRight className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => window.location.reload()}>
+          <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => window.location.reload()}>
             <RotateCw className="w-3.5 h-3.5" />
           </Button>
         </div>
 
         {/* Address Bar */}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="w-full md:flex-1 flex items-center justify-center order-3 md:order-2 mt-1 md:mt-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              // Basic validation
               let urlToLoad = (e.currentTarget.elements.namedItem('urlInput') as HTMLInputElement).value;
               if (urlToLoad) {
-                // Encode and navigate
                 router.push(`/read/${encodeURIComponent(urlToLoad)}`);
               }
             }}
-            className="flex items-center gap-3 w-full max-w-2xl bg-background/50 border border-border/40 hover:border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all rounded-xl px-4 py-2 shadow-sm relative group"
+            className="flex items-center gap-2 md:gap-3 w-full max-w-2xl bg-background/50 border border-border/40 hover:border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all rounded-xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm relative group"
           >
-            <div className="p-1.5 bg-primary/10 rounded-lg text-primary shrink-0">
-              {/* LingoLens Logo Icon */}
+            <div className="p-1 md:p-1.5 bg-primary/10 rounded-lg text-primary shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M3 5H11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M5 5V19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -452,15 +510,14 @@ export default function ReadPage() {
               <input
                 name="urlInput"
                 defaultValue={reconstructUrl(params.url as string | string[]) || ''}
-                key={params.url as string} // Force re-render on param change to update defaultValue
-                className="w-full bg-transparent border-none focus:outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/50 truncate selection:bg-primary/20"
+                key={params.url as string}
+                className="w-full bg-transparent border-none focus:outline-none text-xs md:text-sm font-medium text-foreground placeholder:text-muted-foreground/50 truncate selection:bg-primary/20"
                 placeholder="Enter website URL..."
                 autoComplete="off"
               />
             </div>
 
-            {/* Action Buttons in Address Bar */}
-            <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center shrink-0">
               <LanguageSelector
                 selectedLanguage={targetLanguage}
                 onLanguageChange={handleLanguageChange}
@@ -470,7 +527,7 @@ export default function ReadPage() {
         </div>
 
         {/* Window Controls / Extras */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2 order-2 md:order-3">
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => router.push('/')}>
             <X className="w-4 h-4" />
@@ -509,16 +566,17 @@ export default function ReadPage() {
             onLock={handlePanelLock}
             onHighlight={handlePanelHighlight}
             onRevert={handlePanelRevert}
+            onExplain={handlePanelExplain}
           />
         )}
 
         {/* Explanation Dialog */}
         {explanationData && (
-          <div className="absolute bottom-8 right-8 w-80 bg-background/95 backdrop-blur-md border border-border rounded-xl shadow-2xl p-4 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
-            <div className="flex justify-between items-start mb-2">
+          <div className="absolute bottom-4 right-4 sm:bottom-8 sm:right-8 w-[90vw] sm:w-80 max-w-[400px] bg-background/50 dark:bg-background/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] p-5 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="flex justify-between items-start mb-3">
               <div className="flex items-center gap-2 text-primary font-semibold">
                 <span className="text-xl">✨</span>
-                <span className="text-sm">Context-Aware Explanation</span>
+                <span className="text-sm">AI Explanation</span>
               </div>
               <Button
                 variant="ghost"

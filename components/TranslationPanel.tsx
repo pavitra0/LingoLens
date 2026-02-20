@@ -14,7 +14,8 @@ import {
     Edit2,
     Check,
     Filter,
-    AlertTriangle
+    AlertTriangle,
+    Sparkles
 } from 'lucide-react'
 import { TranslationEntry } from '@/lib/library'
 
@@ -25,6 +26,7 @@ interface TranslationPanelProps {
     onLock: (id: string, locked: boolean) => void;
     onHighlight: (id: string) => void;
     onRevert: (id: string) => void;
+    onExplain: (id: string, text: string) => void;
 }
 
 export default function TranslationPanel({
@@ -33,7 +35,8 @@ export default function TranslationPanel({
     onUpdate,
     onLock,
     onHighlight,
-    onRevert
+    onRevert,
+    onExplain
 }: TranslationPanelProps) {
     const [search, setSearch] = useState('')
     const [filter, setFilter] = useState<'all' | 'locked' | 'modified'>('all')
@@ -78,7 +81,7 @@ export default function TranslationPanel({
     }
 
     return (
-        <div className="absolute top-0 right-0 h-full w-96 bg-background/95 backdrop-blur-xl border-l border-border shadow-2xl z-50 flex flex-col transition-all duration-300 transform translate-x-0">
+        <div className="absolute top-0 right-0 h-full w-[85vw] sm:w-96 bg-background/40 dark:bg-background/40 backdrop-blur-2xl border-l border-white/20 dark:border-white/10 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] z-50 flex flex-col transition-all duration-300 transform translate-x-0">
 
             {/* Header */}
             <div className="p-4 border-b border-border/50 flex flex-col gap-4">
@@ -214,18 +217,26 @@ export default function TranslationPanel({
                             )}
 
                             {/* Footer Actions */}
-                            {(entry.status === 'modified' || entry.original !== entry.translated) && (
-                                <div className="mt-2 pt-2 border-t border-dashed border-border/50 flex justify-end">
+                            <div className="mt-2 pt-2 border-t border-dashed border-border/50 flex justify-end gap-2 text-muted-foreground">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-[10px] hover:text-primary gap-1 px-2"
+                                    onClick={() => onExplain(id, entry.translated)}
+                                >
+                                    <Sparkles className="w-3 h-3 text-purple-500" /> Explain
+                                </Button>
+                                {(entry.status === 'modified' || entry.original !== entry.translated) && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="h-6 text-[10px] text-muted-foreground hover:text-destructive gap-1 px-2"
+                                        className="h-6 text-[10px] hover:text-destructive gap-1 px-2"
                                         onClick={() => onRevert(id)}
                                     >
                                         <RotateCcw className="w-3 h-3" /> Revert
                                     </Button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     ))
                 )}
