@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { getVocabularyList, deleteVocabulary, clearVocabulary, type VocabularyEntry } from '@/lib/library'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Trash2, Library, ExternalLink, Sparkles } from 'lucide-react'
+import { ArrowLeft, Trash2, Library, ExternalLink, Sparkles, Volume2 } from 'lucide-react'
+import { playTextToSpeech } from '@/lib/tts'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -96,7 +97,18 @@ export default function VocabularyPage() {
 
                                     <div className="space-y-4 mb-6">
                                         <div>
-                                            <p className="text-xs uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">Translated</p>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <p className="text-xs uppercase tracking-wider text-muted-foreground/70 font-semibold">Translated</p>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
+                                                    onClick={() => playTextToSpeech(entry.translated, entry.targetLanguage)}
+                                                    title="Listen"
+                                                >
+                                                    <Volume2 className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </div>
                                             <p className="text-xl font-medium text-foreground">{entry.translated}</p>
                                         </div>
                                         <div>

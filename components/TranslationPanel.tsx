@@ -15,12 +15,16 @@ import {
     Check,
     Filter,
     AlertTriangle,
-    Sparkles
+    Sparkles,
+    Volume2,
+    Download
 } from 'lucide-react'
 import { TranslationEntry } from '@/lib/library'
+import { playTextToSpeech } from '@/lib/tts'
 
 interface TranslationPanelProps {
     translations: Record<string, TranslationEntry>;
+    targetLanguage: string;
     onClose: () => void;
     onUpdate: (id: string, text: string) => void;
     onLock: (id: string, locked: boolean) => void;
@@ -31,6 +35,7 @@ interface TranslationPanelProps {
 
 export default function TranslationPanel({
     translations,
+    targetLanguage,
     onClose,
     onUpdate,
     onLock,
@@ -39,7 +44,7 @@ export default function TranslationPanel({
     onExplain
 }: TranslationPanelProps) {
     const [search, setSearch] = useState('')
-    const [filter, setFilter] = useState<'all' | 'locked' | 'modified'>('all')
+    const [filter, setFilter] = useState<'all' | 'locked' | 'modified' | 'errors'>('all')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
 
@@ -54,7 +59,8 @@ export default function TranslationPanel({
             const matchesFilter =
                 filter === 'all' ? true :
                     filter === 'locked' ? entry.isLocked :
-                        filter === 'modified' ? entry.status === 'modified' : true;
+                        filter === 'modified' ? entry.status === 'modified' :
+                            filter === 'errors' ? entry.layoutError === true : true;
 
             return matchesSearch && matchesFilter;
         });
@@ -64,7 +70,8 @@ export default function TranslationPanel({
         return {
             total: entries.length,
             locked: entries.filter(([_, e]) => e.isLocked).length,
-            modified: entries.filter(([_, e]) => e.status === 'modified').length
+            modified: entries.filter(([_, e]) => e.status === 'modified').length,
+            errors: entries.filter(([_, e]) => e.layoutError).length
         }
     }, [entries])
 
@@ -80,23 +87,54 @@ export default function TranslationPanel({
         setEditingId(null)
     }
 
+    const handleExportJSON = () => {
+        const localeData: Record<string, string> = {};
+
+        Object.values(translations).forEach(entry => {
+            if (entry.original && entry.translated) {
+                // If it's locked or modified, prioritize those strings
+                localeData[entry.original] = entry.translated;
+            }
+        });
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localeData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `${targetLanguage}-lingo-export.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
     return (
-        <div className="absolute top-0 right-0 h-full w-[85vw] sm:w-96 bg-background/40 dark:bg-background/40 backdrop-blur-2xl border-l border-white/20 dark:border-white/10 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] z-50 flex flex-col transition-all duration-300 transform translate-x-0">
+        <div className={`absolute top-0 right-0 h-full w-[85vw] sm:w-[400px] bg-background/50 dark:bg-background/40 backdrop-blur-3xl border-l border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] z-50 flex flex-col transition-all duration-500 transform translate-x-0`}>
 
             {/* Header */}
-            <div className="p-4 border-b border-border/50 flex flex-col gap-4">
+            <div className="p-5 border-b border-white/10 flex flex-col gap-4 bg-white/5">
                 <div className="flex items-center justify-between">
                     <h2 className="font-bold text-lg flex items-center gap-2">
                         Translation Control
                         <Badge variant="secondary" className="text-xs font-mono">{stats.total}</Badge>
                     </h2>
-                    <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
-                        <X className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/20 hover:border-primary/30 h-8 gap-1.5 transition-all w-full sm:w-auto px-3"
+                            onClick={handleExportJSON}
+                            title="Download translations as i18n JSON"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline font-semibold">Export JSON</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
+                            <X className="w-4 h-4" />
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Stats Row */}
-                <div className="flex gap-2 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded">
                         <Lock className="w-3 h-3" />
                         <span>{stats.locked} Locked</span>
@@ -105,6 +143,12 @@ export default function TranslationPanel({
                         <Edit2 className="w-3 h-3" />
                         <span>{stats.modified} Modified</span>
                     </div>
+                    {stats.errors > 0 && (
+                        <div className="flex items-center gap-1 bg-red-500/10 text-red-500 px-2 py-1 rounded">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>{stats.errors} Errors</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Search & Filter */}
@@ -125,6 +169,7 @@ export default function TranslationPanel({
                         onClick={() => setFilter(prev => {
                             if (prev === 'all') return 'locked';
                             if (prev === 'locked') return 'modified';
+                            if (prev === 'modified') return 'errors';
                             return 'all';
                         })}
                         title={`Filter: ${filter}`}
@@ -150,9 +195,17 @@ export default function TranslationPanel({
               `}
                         >
                             <div className="flex justify-between items-start gap-2 mb-2">
-                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono uppercase text-muted-foreground">
-                                    {entry.elementTag}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono uppercase text-muted-foreground">
+                                        {entry.elementTag}
+                                    </Badge>
+                                    {entry.layoutError && (
+                                        <Badge variant="destructive" className="text-[10px] h-5 px-1.5 flex gap-1 items-center animate-in fade-in zoom-in">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            {entry.errorType || 'Layout Break'}
+                                        </Badge>
+                                    )}
+                                </div>
 
                                 <div className="flex items-center gap-1 opacity-100 transition-opacity">
                                     <Button
@@ -218,6 +271,14 @@ export default function TranslationPanel({
 
                             {/* Footer Actions */}
                             <div className="mt-2 pt-2 border-t border-dashed border-border/50 flex justify-end gap-2 text-muted-foreground">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-[10px] hover:text-primary gap-1 px-2"
+                                    onClick={() => playTextToSpeech(entry.translated, targetLanguage)}
+                                >
+                                    <Volume2 className="w-3 h-3 text-blue-500" /> Listen
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"

@@ -93,7 +93,7 @@
         background-color: rgba(34, 197, 94, 0.05);
     }
 
-    /* Layout Warning */
+    /* Layout Warning (Original) */
     .lingo-layout-warning::after {
         content: '!';
         position: absolute;
@@ -117,6 +117,63 @@
     .lingo-layout-warning {
         position: relative; 
         outline: 1px dashed #eab308 !important;
+    }
+
+    /* Layout Error (Visual Bug Catcher) */
+    .lingo-layout-error::after {
+        content: '⚠️';
+        position: absolute;
+        top: -12px;
+        right: -12px;
+        font-size: 12px;
+        background: #ef4444; 
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+        z-index: 20;
+        cursor: help;
+        border: 2px solid white;
+        animation: lingo-pulse-error 2s infinite;
+    }
+    .lingo-layout-error {
+        position: relative !important;
+        box-shadow: inset 0 0 0 2px #ef4444, 0 0 0 2px rgba(239,68,68,0.3) !important;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+    }
+    @keyframes lingo-pulse-error {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    /* Health Badges inside Tooltip */
+    .lingo-tooltip-health-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-left: 6px;
+      text-transform: uppercase;
+    }
+    .lingo-badge-safe {
+      background: rgba(34, 197, 94, 0.15); /* Green */
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .lingo-badge-error {
+      background: rgba(239, 68, 68, 0.15); /* Red */
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
     }
   `;
     document.head.appendChild(style);
@@ -234,6 +291,30 @@
         const y = rect.top + window.scrollY;
 
         createTooltip(x, y);
+
+        // Update tooltip content based on health metrics
+        if (activeTooltip) {
+            const span = activeTooltip.querySelector('span');
+            if (span) {
+                let innerText = "Translate";
+                let badgeHtml = "";
+
+                if (target.dataset.lingoState === 'translating') {
+                    innerText = "Translating...";
+                } else if (target.dataset.lingoState === 'translated') {
+                    innerText = "Focus in Panel";
+
+                    if (target.dataset.layoutError) {
+                        badgeHtml = `<span class="lingo-tooltip-health-badge lingo-badge-error">⚠️ Broken (${target.dataset.layoutError})</span>`;
+                    } else if (target.dataset.layoutSafe === 'true') {
+                        badgeHtml = `<span class="lingo-tooltip-health-badge lingo-badge-safe">✅ Layout Safe</span>`;
+                    }
+                }
+
+                span.innerHTML = `${innerText} ${badgeHtml}`;
+            }
+        }
+
         e.stopPropagation();
     });
 
@@ -373,6 +454,17 @@
         if (!event.data) return;
 
         console.log('[Lingo] Received message:', event.data.type);
+
+        if (event.data.type === 'TOGGLE_MARQUEE') {
+            const { isActive } = event.data;
+            if (isActive) {
+                enableMarqueeMode();
+            } else {
+                disableMarqueeMode();
+            }
+            return;
+        }
+
         if (event.data.type === 'TRIGGER_BATCH_TRANSLATE') {
             const visibleElements = [];
             // Broader selection for batch
@@ -385,23 +477,20 @@
                 if (translatedTexts.has(id)) return;
                 if (el.dataset.lingoState === 'translated') return;
 
-                // Check visibility
+                // Check if element intersects viewport strictly
                 const rect = el.getBoundingClientRect();
+                const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+                const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+
+                // Element is visible if it intersects the viewport vertically and horizontally
                 const isVisible = (
-                    rect.top >= 0 &&
-                    rect.left >= 0 &&
-                    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-                    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+                    rect.top < windowHeight &&
+                    rect.bottom > 0 &&
+                    rect.left < windowWidth &&
+                    rect.right > 0
                 );
 
-                // Allow some buffer (e.g. 1 screen height)
-                const buffer = window.innerHeight;
-                const isNearViewport = (
-                    rect.top >= -buffer &&
-                    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) + buffer
-                );
-
-                if (isNearViewport) {
+                if (isVisible) {
                     visibleElements.push({ id, text: el.innerText.trim(), element: el });
                 }
             });
@@ -585,29 +674,47 @@
                 target.dataset.lingoState = 'translated';
                 target.classList.add('lingo-translated');
 
-                // Layout Safety Check (Tier 2)
+                // Layout Safety Check (Inspector)
                 const originalDims = originalDimensions.get(id);
                 if (originalDims) {
-                    const newWidth = target.offsetWidth;
-                    const newHeight = target.offsetHeight;
-                    const newScrollWidth = target.scrollWidth;
+                    // Let the browser paint before measuring to get accurate after-translation dimensions
+                    setTimeout(() => {
+                        const newWidth = target.offsetWidth;
+                        const newHeight = target.offsetHeight;
+                        const newScrollWidth = target.scrollWidth;
 
-                    // If width grew significantly (> 20%) or height changed significantly, warn
-                    // Or if scrollWidth > clientWidth (overflow)
-                    const isOverflowing = newScrollWidth > newWidth;
-                    const widthGrowth = (newWidth - originalDims.width) / originalDims.width;
-                    const heightGrowth = (newHeight - originalDims.height) / originalDims.height;
+                        // Detection thresholds
+                        const isOverflowing = newScrollWidth > newWidth && newWidth > 0;
+                        const heightGrowth = (newHeight - originalDims.height) / (originalDims.height || 1);
 
-                    if (isOverflowing || Math.abs(widthGrowth) > 0.2 || Math.abs(heightGrowth) > 0.3) {
-                        // Apply warning
-                        if (window.getComputedStyle(target).position === 'static') {
-                            target.style.position = 'relative'; // Need relative for pseudo-element
+                        // Strict check: if it wrapped to a new line unexpectedly (height grew by > 50% for inline/inline-block elements)
+                        const isWrappingError = heightGrowth > 0.5 && originalDims.height < 50;
+
+                        if (isOverflowing || isWrappingError) {
+                            if (window.getComputedStyle(target).position === 'static') {
+                                target.style.position = 'relative';
+                            }
+                            target.classList.add('lingo-layout-error');
+
+                            const errorType = isOverflowing ? 'Overflow' : 'Text Wrapping';
+                            target.title = `Layout Break Detected: ${errorType}`;
+                            target.dataset.layoutError = isOverflowing ? 'Overflow' : 'Wrapping';
+
+                            // Dispatch error to parent React app
+                            window.parent.postMessage({
+                                type: 'LAYOUT_ERROR_DETECTED',
+                                id: id,
+                                errorType: errorType,
+                                text: translatedText
+                            }, '*');
+
+                            console.warn(`[Lingo] Layout Error (${errorType}) on:`, target);
+
+                        } else {
+                            target.classList.remove('lingo-layout-error');
+                            target.dataset.layoutSafe = 'true';
                         }
-                        target.classList.add('lingo-layout-warning');
-                        target.title = 'Translation caused significant layout shift.';
-                    } else {
-                        target.classList.remove('lingo-layout-warning');
-                    }
+                    }, 50); // slight delay for DOM reflow
                 }
 
             } else {
@@ -629,12 +736,20 @@
         explainButton = document.createElement('div');
         explainButton.className = 'lingo-explain-btn';
         explainButton.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
-                <path d="M12 2a10 10 0 0 1 10 10"></path>
-                <path d="M12 12 2.1 12"></path>
-            </svg>
-            Explain
+            <div class="lingo-explain-content" style="display:flex;align-items:center;gap:6px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                    <path d="M12 2a10 10 0 0 1 10 10"></path>
+                    <path d="M12 12 2.1 12"></path>
+                </svg>
+                <span>Explain</span>
+            </div>
+            <div class="lingo-explain-spinner" style="display:none;align-items:center;gap:6px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:lingo-spin 1s linear infinite;">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                <span>Thinking...</span>
+            </div>
         `;
         explainButton.style.cssText = `
             position: fixed;
@@ -655,6 +770,18 @@
             pointer-events: auto;
             transform-origin: center bottom;
         `;
+
+        // Add spinner animation style if not exists
+        if (!document.getElementById('lingo-spinner-style')) {
+            const spinnerStyle = document.createElement('style');
+            spinnerStyle.id = 'lingo-spinner-style';
+            spinnerStyle.textContent = `
+                @keyframes lingo-spin {
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(spinnerStyle);
+        }
 
         explainButton.onmousedown = (e) => {
             e.preventDefault(); // Prevent clearing selection
@@ -679,15 +806,35 @@
                     context = parentBlock ? parentBlock.innerText.substring(0, 800) : (anchorNode.parentElement?.innerText || "");
                 }
 
+                // Show Spinner State
+                const contentDiv = explainButton.querySelector('.lingo-explain-content');
+                const spinnerDiv = explainButton.querySelector('.lingo-explain-spinner');
+                if (contentDiv && spinnerDiv) {
+                    contentDiv.style.display = 'none';
+                    spinnerDiv.style.display = 'flex';
+                }
+
                 window.parent.postMessage({
                     type: 'EXPLAIN_REQUEST',
                     selectedText,
                     surroundingText: context
                 }, '*');
+
+                // Let it spin for a moment while the parent fetches, then hide the button and clear formatting
+                setTimeout(() => {
+                    hideExplainButton();
+                    window.getSelection().removeAllRanges();
+
+                    // Reset State for next time
+                    if (contentDiv && spinnerDiv) {
+                        contentDiv.style.display = 'flex';
+                        spinnerDiv.style.display = 'none';
+                    }
+                }, 1500);
+            } else {
+                hideExplainButton();
+                window.getSelection().removeAllRanges();
             }
-            hideExplainButton();
-            // Clear selection after clicking
-            window.getSelection().removeAllRanges();
         };
 
         document.body.appendChild(explainButton);
@@ -729,6 +876,13 @@
             setTimeout(() => {
                 if (explainButton.style.opacity === '0') {
                     explainButton.style.display = 'none';
+                    // Reset spinner state
+                    const contentDiv = explainButton.querySelector('.lingo-explain-content');
+                    const spinnerDiv = explainButton.querySelector('.lingo-explain-spinner');
+                    if (contentDiv && spinnerDiv) {
+                        contentDiv.style.display = 'flex';
+                        spinnerDiv.style.display = 'none';
+                    }
                 }
             }, 200);
         }
@@ -813,5 +967,139 @@
             }, '*');
         }
     }, 1000);
+
+    // Area Selection (Marquee) Tool
+    let marqueeActive = false;
+    let isDrawing = false;
+    let selectionBox = null;
+    let startX = 0;
+    let startY = 0;
+
+    function enableMarqueeMode() {
+        marqueeActive = true;
+        document.body.style.cursor = 'crosshair';
+        document.body.style.userSelect = 'none';
+
+        // Remove existing tooltip/explain stuff just in case
+        removeTooltip();
+        hideExplainButton();
+    }
+
+    function disableMarqueeMode() {
+        marqueeActive = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        if (selectionBox) {
+            selectionBox.remove();
+            selectionBox = null;
+        }
+    }
+
+    // Capture events in capture phase so we overrule clicks
+    document.addEventListener('mousedown', (e) => {
+        if (!marqueeActive) return;
+        if (e.button !== 0) return; // Only left click
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        isDrawing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        selectionBox = document.createElement('div');
+        selectionBox.style.cssText = `
+            position: fixed;
+            border: 2px dashed rgba(79, 70, 229, 0.8);
+            background: rgba(79, 70, 229, 0.15);
+            backdrop-filter: blur(2px);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+            z-index: 2147483647;
+            pointer-events: none;
+            left: ${startX}px;
+            top: ${startY}px;
+            width: 0px;
+            height: 0px;
+        `;
+        document.body.appendChild(selectionBox);
+    }, { capture: true });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!marqueeActive || !isDrawing || !selectionBox) return;
+
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+
+        const width = Math.abs(currentX - startX);
+        const height = Math.abs(currentY - startY);
+        const left = Math.min(currentX, startX);
+        const top = Math.min(currentY, startY);
+
+        selectionBox.style.width = width + 'px';
+        selectionBox.style.height = height + 'px';
+        selectionBox.style.left = left + 'px';
+        selectionBox.style.top = top + 'px';
+    }, { capture: true });
+
+    document.addEventListener('mouseup', (e) => {
+        if (!marqueeActive || !isDrawing) return;
+        isDrawing = false;
+
+        // Perform Intersection Check
+        if (selectionBox) {
+            const boxRect = selectionBox.getBoundingClientRect();
+            selectionBox.remove();
+            selectionBox = null;
+
+            // If box is too small, treat it as a click or cancel
+            if (boxRect.width < 10 || boxRect.height < 10) {
+                // Ignore small clicks
+                return;
+            }
+
+            const visibleElements = [];
+            const allElements = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, td, span, div, a, button, label');
+
+            allElements.forEach(el => {
+                if (!isValidElement(el)) return;
+
+                const id = getUniqueId(el);
+                if (translatedTexts.has(id)) return;
+                if (el.dataset.lingoState === 'translated') return;
+
+                const rect = el.getBoundingClientRect();
+
+                // Check Intersection
+                const intersectX = Math.max(0, Math.min(rect.right, boxRect.right) - Math.max(rect.left, boxRect.left));
+                const intersectY = Math.max(0, Math.min(rect.bottom, boxRect.bottom) - Math.max(rect.top, boxRect.top));
+
+                if (intersectX > 0 && intersectY > 0) {
+                    visibleElements.push({ id, text: el.innerText.trim(), element: el });
+                }
+            });
+
+            if (visibleElements.length > 0) {
+                // Show loading state
+                visibleElements.forEach(item => {
+                    item.element.classList.add('lingo-translating');
+                    if (!originalTexts.has(item.id)) {
+                        originalTexts.set(item.id, item.text);
+                    }
+                });
+
+                window.parent.postMessage({
+                    type: 'BATCH_TRANSLATE_REQUEST',
+                    payload: visibleElements.map(item => ({ id: item.id, text: item.text }))
+                }, '*');
+
+                console.log(`[Lingo] Area Translate triggered on ${visibleElements.length} elements.`);
+            }
+
+            // Optional: Auto-disable tool after drawing once
+            // disableMarqueeMode();
+            // window.parent.postMessage({ type: 'TOGGLE_MARQUEE', isActive: false }, '*');
+        }
+    }, { capture: true });
 
 })();

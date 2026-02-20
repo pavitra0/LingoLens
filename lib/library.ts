@@ -5,6 +5,8 @@ export interface TranslationEntry {
     isLocked: boolean;
     status: 'active' | 'modified';
     timestamp: number;
+    layoutError?: boolean;
+    errorType?: string;
 }
 
 export interface SavedPage {

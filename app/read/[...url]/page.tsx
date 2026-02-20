@@ -3,13 +3,12 @@
 import { translateBatch } from '@/app/actions/translateBatch'
 import { translateMarkdown } from '@/app/actions/translate'
 import LanguageSelector from '@/components/LanguageSelector'
-import ThemeToggle from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { reconstructUrl } from '@/lib/utils'
 import TranslationPanel from '@/components/TranslationPanel' // Import component
 import { getSavedPage, savePage, addVocabulary, type SavedPage, type TranslationEntry } from '@/lib/library' // Import library types
 import { explainText } from '@/app/actions/explain' // Import explanation action
-import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, List, PanelsTopLeft, BookOpen } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, BookOpen, LayoutTemplate, LayoutGrid, PanelsTopLeft, MousePointerSquareDashed } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -23,6 +22,7 @@ export default function ReadPage() {
   const [error, setError] = useState<string | null>(null)
   const [targetLanguage, setTargetLanguage] = useState<string>('es') // Default to Spanish
   const [translating, setTranslating] = useState(false)
+  const [isMarqueeActive, setIsMarqueeActive] = useState(false)
   const [proxyUrl, setProxyUrl] = useState<string | null>(null)
   const [iframeLoaded, setIframeLoaded] = useState(false)
   const [isSaved, setIsSaved] = useState(false) // Track saved state
@@ -166,7 +166,6 @@ export default function ReadPage() {
             // -----------------------------
 
           } else {
-            // ... error handling
             if (iframeRef.current && iframeRef.current.contentWindow) {
               iframeRef.current.contentWindow.postMessage({ type: 'TRANSLATION_RESULT', id, success: false }, '*');
             }
@@ -252,6 +251,23 @@ export default function ReadPage() {
         }
       }
 
+      // Layout Error (Developer Mode)
+      if (type === 'LAYOUT_ERROR_DETECTED') {
+        const { id, errorType } = event.data;
+        setCurrentTranslations(prev => {
+          const entry = prev[id];
+          if (!entry) return prev;
+          return {
+            ...prev,
+            [id]: {
+              ...entry,
+              layoutError: true,
+              errorType: errorType
+            }
+          };
+        });
+      }
+
       // Theme Color
       if (type === 'THEME_COLOR_DETECTED') {
         const { color } = event.data;
@@ -263,7 +279,7 @@ export default function ReadPage() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [targetLanguage, params, showPanel]); // Added showPanel to dependency
+  }, [targetLanguage, params, showPanel]);
 
   const refreshPanelState = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -410,128 +426,170 @@ export default function ReadPage() {
     )
   }
 
+  // Construct a dynamic global string for inline styling the background
+  const dynamicBackgroundStyle = dynamicThemeColor
+    ? { backgroundImage: `radial-gradient(ellipse at 50% -20%, ${dynamicThemeColor}40 0%, transparent 70%), linear-gradient(to bottom, #0a0a0a, #0a0a0a)` }
+    : { backgroundColor: '#0a0a0a' };
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background bg-[url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center">
-      {/* Browser Toolbar */}
-      <div
-        className="flex-none bg-background/50 dark:bg-background/40 backdrop-blur-2xl border-b border-white/20 dark:border-white/10 p-2 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 md:gap-4 transition-all duration-1000 z-50"
-        style={{
-          backgroundColor: dynamicThemeColor ? `${dynamicThemeColor}80` : undefined, // Add transparency
-          borderColor: dynamicThemeColor ? `${dynamicThemeColor}` : undefined
-        }}
-      >
+    <div className="h-screen flex flex-col overflow-hidden relative" style={dynamicBackgroundStyle}>
 
-        {/* Navigation Controls */}
-        <div className="flex items-center gap-1 md:gap-2 text-muted-foreground order-1">
-          {/* Magic Wand Batch Translate */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 hover:bg-primary/10 hover:text-primary rounded-full transition-colors ${translating ? 'animate-pulse text-primary' : ''}`}
-            onClick={() => {
-              if (iframeRef.current && iframeRef.current.contentWindow) {
-                iframeRef.current.contentWindow.postMessage({ type: 'TRIGGER_BATCH_TRANSLATE' }, '*');
-              }
-            }}
-            title="Translate Visible Content"
-          >
-            <Wand2 className="w-4 h-4" />
-          </Button>
+      {/* Animated Background Mesh (matches homepage style) */}
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-50">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+      </div>
 
-          {/* Control Panel Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 rounded-full transition-colors ${showPanel ? 'text-primary bg-primary/10' : 'hover:bg-primary/10 hover:text-primary'}`}
-            onClick={togglePanel}
-            title="Translation Control Panel"
-          >
-            <PanelsTopLeft className="w-4 h-4" />
-          </Button>
+      {/* Floating Browser Island */}
+      <div className="w-full flex justify-center pt-4 pb-2 px-4 z-50">
+        <div
+          className="w-full max-w-6xl bg-black/40 backdrop-blur-3xl border border-white/10 rounded-full p-2 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 md:gap-4 shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-all duration-1000"
+          style={{
+            boxShadow: dynamicThemeColor ? `0 8px 32px 0 ${dynamicThemeColor}20, inset 0 0 0 1px ${dynamicThemeColor}40` : undefined
+          }}
+        >
 
-          {/* Bookmark / Save Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 rounded-full transition-colors ${isSaved ? 'text-primary bg-primary/10' : 'hover:bg-primary/10 hover:text-primary'}`}
-            onClick={handleSavePage}
-            title={isSaved ? "Translation Saved" : "Save Translation"}
-          >
-            {isSaved ? <Bookmark className="w-4 h-4 fill-current" /> : <Save className="w-4 h-4" />}
-          </Button>
+          {/* Navigation Controls */}
+          <div className="flex items-center gap-1 md:gap-2 text-muted-foreground order-1 pl-2">
+            {/* Area Selection Tool (Marquee) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${isMarqueeActive ? 'text-primary bg-primary/10 animate-pulse' : 'hover:bg-primary/10 hover:text-primary'}`}
+              onClick={() => {
+                const newState = !isMarqueeActive;
+                setIsMarqueeActive(newState);
+                if (iframeRef.current && iframeRef.current.contentWindow) {
+                  iframeRef.current.contentWindow.postMessage({ type: 'TOGGLE_MARQUEE', isActive: newState }, '*');
+                }
+              }}
+              title="Drag to Translate Area"
+            >
+              <MousePointerSquareDashed className="w-4 h-4" />
+            </Button>
 
-          {/* Vocabulary / Flashcards */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-primary/10 hover:text-primary rounded-full transition-colors"
-            onClick={() => router.push('/vocabulary')}
-            title="Vocabulary List"
-          >
-            <BookOpen className="w-4 h-4" />
-          </Button>
+            {/* Magic Wand Batch Translate */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 hover:bg-primary/10 hover:text-primary rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${translating ? 'animate-pulse text-primary' : ''}`}
+              onClick={() => {
+                if (iframeRef.current && iframeRef.current.contentWindow) {
+                  iframeRef.current.contentWindow.postMessage({ type: 'TRIGGER_BATCH_TRANSLATE' }, '*');
+                }
+              }}
+              title="Translate Visible Content"
+            >
+              <Wand2 className="w-4 h-4" />
+            </Button>
 
-          <div className="hidden md:block w-px h-4 bg-border mx-1" />
+            {/* Control Panel Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${showPanel ? 'text-primary bg-primary/10' : 'hover:bg-primary/10 hover:text-primary'}`}
+              onClick={togglePanel}
+              title="Translation Control Panel"
+            >
+              <PanelsTopLeft className="w-4 h-4" />
+            </Button>
 
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => router.back()}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" disabled>
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => window.location.reload()}>
-            <RotateCw className="w-3.5 h-3.5" />
-          </Button>
-        </div>
+            {/* Matrix View Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-all duration-200 hover:scale-110 active:scale-95"
+              onClick={() => {
+                const urlToLoad = reconstructUrl(params.url as string | string[]) || '';
+                router.push(`/matrix/${encodeURIComponent(urlToLoad)}`);
+              }}
+              title="Open Matrix View (4-Pane)"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
 
-        {/* Address Bar */}
-        <div className="w-full md:flex-1 flex items-center justify-center order-3 md:order-2 mt-1 md:mt-0">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              let urlToLoad = (e.currentTarget.elements.namedItem('urlInput') as HTMLInputElement).value;
-              if (urlToLoad) {
-                router.push(`/read/${encodeURIComponent(urlToLoad)}`);
-              }
-            }}
-            className="flex items-center gap-2 md:gap-3 w-full max-w-2xl bg-background/50 border border-border/40 hover:border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all rounded-xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm relative group"
-          >
-            <div className="p-1 md:p-1.5 bg-primary/10 rounded-lg text-primary shrink-0">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 5H11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M5 5V19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M15 9L21 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M18 9L18 19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
+            {/* Bookmark / Save Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${isSaved ? 'text-primary bg-primary/10' : 'hover:bg-primary/10 hover:text-primary'}`}
+              onClick={handleSavePage}
+              title={isSaved ? "Translation Saved" : "Save Translation"}
+            >
+              {isSaved ? <Bookmark className="w-4 h-4 fill-current" /> : <Save className="w-4 h-4" />}
+            </Button>
 
-            <div className="flex-1 flex items-center gap-2 overflow-hidden">
-              <LockIcon className="w-3 h-3 text-green-500/80 shrink-0" />
-              <input
-                name="urlInput"
-                defaultValue={reconstructUrl(params.url as string | string[]) || ''}
-                key={params.url as string}
-                className="w-full bg-transparent border-none focus:outline-none text-xs md:text-sm font-medium text-foreground placeholder:text-muted-foreground/50 truncate selection:bg-primary/20"
-                placeholder="Enter website URL..."
-                autoComplete="off"
-              />
-            </div>
+            {/* Vocabulary / Flashcards */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-primary/10 hover:text-primary rounded-full transition-all duration-200 hover:scale-110 active:scale-95"
+              onClick={() => router.push('/vocabulary')}
+              title="Vocabulary List"
+            >
+              <BookOpen className="w-4 h-4" />
+            </Button>
 
-            <div className="flex items-center shrink-0">
-              <LanguageSelector
-                selectedLanguage={targetLanguage}
-                onLanguageChange={handleLanguageChange}
-              />
-            </div>
-          </form>
-        </div>
+            <div className="hidden md:block w-px h-4 bg-border mx-1" />
 
-        {/* Window Controls / Extras */}
-        <div className="flex items-center gap-1 md:gap-2 order-2 md:order-3">
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => router.push('/')}>
-            <X className="w-4 h-4" />
-          </Button>
+            <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => router.back()}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" disabled>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="hidden md:inline-flex h-8 w-8 hover:bg-background/50 rounded-full" onClick={() => window.location.reload()}>
+              <RotateCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+
+          {/* Address Bar */}
+          <div className="w-full md:flex-1 flex items-center justify-center order-3 md:order-2 mt-1 md:mt-0">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                let urlToLoad = (e.currentTarget.elements.namedItem('urlInput') as HTMLInputElement).value;
+                if (urlToLoad) {
+                  router.push(`/read/${encodeURIComponent(urlToLoad)}`);
+                }
+              }}
+              className="flex items-center gap-2 md:gap-3 w-full max-w-2xl bg-background/50 border border-border/40 hover:border-border/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all rounded-xl px-3 py-1.5 md:px-4 md:py-2 shadow-sm relative group"
+            >
+              <div className="p-1 md:p-1.5 bg-primary/10 rounded-lg text-primary shrink-0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 5H11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 5V19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M15 9L21 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M18 9L18 19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              <div className="flex-1 flex items-center gap-2 overflow-hidden">
+                <LockIcon className="w-3 h-3 text-green-500/80 shrink-0" />
+                <input
+                  name="urlInput"
+                  defaultValue={reconstructUrl(params.url as string | string[]) || ''}
+                  key={params.url as string}
+                  className="w-full bg-transparent border-none focus:outline-none text-xs md:text-sm font-medium text-foreground placeholder:text-muted-foreground/50 truncate selection:bg-primary/20"
+                  placeholder="Enter website URL..."
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex items-center shrink-0">
+                <LanguageSelector
+                  selectedLanguage={targetLanguage}
+                  onLanguageChange={handleLanguageChange}
+                />
+              </div>
+            </form>
+          </div>
+
+          {/* Window Controls / Extras */}
+          <div className="flex items-center gap-1 md:gap-2 order-2 md:order-3">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-white/10" onClick={() => router.push('/')}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -546,6 +604,18 @@ export default function ReadPage() {
               </div>
             </div>
           )}
+          {/* Animated Onboarding Hint */}
+          {iframeLoaded && Object.keys(currentTranslations).length === 0 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-in fade-in slide-in-from-top-4 duration-1000 delay-500">
+              <div className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-full font-medium shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] flex items-center gap-3 ring-2 ring-primary/30 ring-offset-2 ring-offset-background transition-all">
+                <Wand2 className="w-4 h-4 animate-pulse" />
+                <span className="text-sm">Click the <b>Magic Wand</b> or hover over text to translate</span>
+              </div>
+              {/* Pointer line pointing up towards the toolbar */}
+              <div className="w-px h-12 bg-gradient-to-t from-transparent to-primary/50 -mt-16 -order-1 mb-2" />
+            </div>
+          )}
+
           <iframe
             ref={iframeRef}
             src={proxyUrl}
@@ -557,10 +627,11 @@ export default function ReadPage() {
         </div>
 
 
-        {/* ... Sliding Panel ... */}
+        {/* Sliding Panel */}
         {showPanel && (
           <TranslationPanel
             translations={currentTranslations}
+            targetLanguage={targetLanguage}
             onClose={() => setShowPanel(false)}
             onUpdate={handlePanelUpdate}
             onLock={handlePanelLock}

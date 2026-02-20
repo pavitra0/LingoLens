@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Globe, Layout, Sparkles, BookOpen } from "lucide-react";
+import { ArrowRight, Globe, Layout, Sparkles, BookOpen, PanelsTopLeft, MousePointerSquareDashed, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -21,47 +21,53 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-foreground relative overflow-hidden bg-background bg-[url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center before:absolute before:inset-0 before:bg-background/80 dark:before:bg-background/80">
+    <div className="min-h-screen flex flex-col items-center justify-center text-foreground relative overflow-hidden bg-[#0A0A0A]">
+
+      {/* Animated Background Mesh & Grid */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+      </div>
 
       {/* Header */}
       <header className="absolute top-0 w-full p-6 flex justify-end z-20">
-        <Button variant="outline" className="bg-background/50 backdrop-blur-md hover:bg-background/80 shadow-sm border-white/20" onClick={() => router.push('/vocabulary')}>
+        <Button variant="outline" className="bg-white/5 backdrop-blur-xl hover:bg-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.1)] border-white/10 text-foreground transition-all duration-300" onClick={() => router.push('/vocabulary')}>
           <BookOpen className="w-4 h-4 mr-2 text-primary" />
           Vocabulary
         </Button>
       </header>
 
-      <main className="w-full max-w-5xl px-6 flex flex-col items-center text-center z-10 space-y-12 mt-12">
+      <main className="w-full max-w-5xl px-6 flex flex-col items-center text-center z-10 space-y-16 mt-16">
         {/* Hero Section */}
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 backdrop-blur-md border border-border/50 text-xs font-medium text-secondary-foreground mb-8 shadow-sm ring-1 ring-white/20">
-            <Sparkles className="w-3 h-3 text-primary" />
-            <span>AI-Powered Website Translation</span>
+        <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold uppercase tracking-widest text-primary mb-8 shadow-[0_0_20px_rgba(var(--primary),0.2)]">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Developer Tools for Global Apps</span>
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground text-balance drop-shadow-sm">
-            The Web, in <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-500 to-purple-600">
-              Your Language.
+          <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight text-white drop-shadow-2xl">
+            The IDE for <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-primary to-purple-500 blur-0">
+              i18n.
             </span>
           </h1>
-          <p className="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            LingoLens actively preserves the original design and layout of any website while instantly translating the content.
+          <p className="mt-8 text-lg md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed font-light">
+            Instantly translate, inspect, and extract UI components in any language without leaving the browser.
           </p>
         </div>
 
         {/* Input Section */}
-        <div className="w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150">
+        <div className="w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
           <form onSubmit={handleTranslate} className="relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-2xl blur opacity-30 group-hover:opacity-60 transition duration-500" />
-            <div className="relative flex items-center bg-background/80 backdrop-blur-xl rounded-xl p-2 shadow-2xl border border-white/10">
-              <div className="pl-4 text-muted-foreground">
-                <Globe className="w-5 h-5" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-primary to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
+            <div className="relative flex items-center bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-2xl p-2 shadow-2xl border border-white/10">
+              <div className="pl-5 text-muted-foreground group-focus-within:text-primary transition-colors">
+                <Globe className="w-6 h-6" />
               </div>
               <input
                 type="text"
                 placeholder="Paste any URL (e.g. paulgraham.com)"
-                className="flex-1 bg-transparent border-none px-4 py-4 text-base focus:outline-none placeholder:text-muted-foreground/70 text-foreground"
+                className="flex-1 bg-transparent border-none px-5 py-5 text-lg focus:outline-none placeholder:text-muted-foreground/50 text-white"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 autoFocus
@@ -70,47 +76,59 @@ export default function Home() {
                 size="lg"
                 type="submit"
                 disabled={!url}
-                className="rounded-lg px-8 h-12 font-medium shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="rounded-xl px-10 h-14 font-semibold text-base shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:hover:scale-100"
               >
-                Translate
+                Translate <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </div>
           </form>
 
           {/* Features Grid */}
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-            <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors">
-              <div className="p-2 rounded-full bg-primary/10 text-primary">
-                <Layout className="w-5 h-5" />
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 ring-1 ring-cyan-500/30">
+                <PanelsTopLeft className="w-6 h-6" />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold text-foreground mb-1">Layout Preserved</h3>
-                <p className="text-muted-foreground">No broken styles or overlapping text.</p>
+                <h3 className="font-semibold text-white/90 mb-1 text-base">Matrix View</h3>
+                <p className="text-muted-foreground leading-relaxed text-xs">Test 4 languages on your UI simultaneously.</p>
               </div>
             </div>
-            <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors">
-              <div className="p-2 rounded-full bg-primary/10 text-primary">
-                <Globe className="w-5 h-5" />
+
+            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-400 ring-1 ring-purple-500/30">
+                <MousePointerSquareDashed className="w-6 h-6" />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold text-foreground mb-1">Global Context</h3>
-                <p className="text-muted-foreground">Translate entire pages instantly.</p>
+                <h3 className="font-semibold text-white/90 mb-1 text-base">Area Translate</h3>
+                <p className="text-muted-foreground leading-relaxed text-xs">Drag a marquee over specific components.</p>
               </div>
             </div>
-            <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors">
-              <div className="p-2 rounded-full bg-primary/10 text-primary">
-                <Sparkles className="w-5 h-5" />
+
+            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 ring-1 ring-amber-500/30">
+                <Layout className="w-6 h-6" />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold text-foreground mb-1">Smart AI</h3>
-                <p className="text-muted-foreground">Detects content, ignores code.</p>
+                <h3 className="font-semibold text-white/90 mb-1 text-base">Layout Inspector</h3>
+                <p className="text-muted-foreground leading-relaxed text-xs">Auto-detect broken CSS overflow & wrapping.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 text-green-400 ring-1 ring-green-500/30">
+                <Download className="w-6 h-6" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-white/90 mb-1 text-base">Locale Exporter</h3>
+                <p className="text-muted-foreground leading-relaxed text-xs">Extract fixed translations directly to JSON.</p>
               </div>
             </div>
           </div>
         </div>
       </main>
 
-      <footer className="absolute bottom-6 w-full text-center text-sm text-muted-foreground/60">
+      <footer className="absolute bottom-6 w-full text-center text-sm font-medium text-muted-foreground/40">
         <p>&copy; {new Date().getFullYear()} LingoLens. Preserving the web's beauty.</p>
       </footer>
     </div>
