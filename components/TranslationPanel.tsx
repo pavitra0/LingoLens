@@ -24,6 +24,7 @@ import { useVocabularyList, useDeleteVocabulary } from '@/lib/hooks/useLibrary'
 import { playTextToSpeech } from '@/lib/tts'
 
 interface TranslationPanelProps {
+    currentUrl?: string;
     translations: Record<string, TranslationEntry>;
     targetLanguage: string;
     onClose: () => void;
@@ -35,6 +36,7 @@ interface TranslationPanelProps {
 }
 
 export default function TranslationPanel({
+    currentUrl,
     translations,
     targetLanguage,
     onClose,
@@ -52,6 +54,17 @@ export default function TranslationPanel({
 
     const { data: vocabList = [] } = useVocabularyList();
     const deleteVocabMutation = useDeleteVocabulary();
+
+    const filteredVocabList = useMemo(() => {
+        if (!currentUrl) return vocabList;
+        return vocabList.filter(v => {
+            try {
+                return new URL(v.url).hostname === new URL(currentUrl).hostname;
+            } catch {
+                return v.url === currentUrl;
+            }
+        });
+    }, [vocabList, currentUrl]);
 
     const entries = useMemo(() => Object.entries(translations), [translations])
 
@@ -197,9 +210,9 @@ export default function TranslationPanel({
                     onClick={() => setActiveTab('vocabulary')}
                 >
                     Vocabulary
-                    {vocabList.length > 0 && (
+                    {filteredVocabList.length > 0 && (
                         <Badge variant="secondary" className="px-1.5 h-4 text-[10px] bg-primary/20 text-primary border-none">
-                            {vocabList.length}
+                            {filteredVocabList.length}
                         </Badge>
                     )}
                 </button>
@@ -330,18 +343,18 @@ export default function TranslationPanel({
                     )
                 ) : (
                     /* Vocabulary Tab Content */
-                    vocabList.length === 0 ? (
+                    filteredVocabList.length === 0 ? (
                         <div className="text-center py-10 space-y-2">
                             <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
                                 <Sparkles className="w-5 h-5 text-primary/50" />
                             </div>
-                            <p className="text-sm font-medium text-foreground">No Vocabulary Yet</p>
+                            <p className="text-sm font-medium text-foreground">No Vocabulary Found</p>
                             <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
-                                Click 'Explain' on any translation to save it to your vocabulary list.
+                                Click 'Explain' on translations from this website to save them to your vocabulary.
                             </p>
                         </div>
                     ) : (
-                        vocabList.map((entry) => (
+                        filteredVocabList.map((entry) => (
                             <div key={entry.id} className="border border-border/50 bg-card rounded-lg p-3 space-y-3">
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-2">

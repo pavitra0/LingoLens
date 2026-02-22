@@ -44,7 +44,7 @@ export default function Home() {
             <span>Developer Tools for Global Apps</span>
           </div>
 
-          <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight text-white drop-shadow-2xl">
+          <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight text-white drop-shadow-2xl font-outfit">
             The IDE for <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-primary to-purple-500 blur-0">
               i18n.

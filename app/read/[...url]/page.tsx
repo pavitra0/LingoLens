@@ -9,7 +9,7 @@ import TranslationPanel from '@/components/TranslationPanel' // Import component
 import { type SavedPage, type TranslationEntry } from '@/lib/library' // Import legacy library types
 import { useSavePage, useSavedPage, useAddVocabulary } from '@/lib/hooks/useLibrary'
 import { explainText } from '@/app/actions/explain' // Import explanation action
-import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, BookOpen, LayoutTemplate, LayoutGrid, PanelsTopLeft, MousePointerSquareDashed } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, BookOpen, LayoutTemplate, LayoutGrid, PanelsTopLeft, MousePointerSquareDashed, Volume2 } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState, Suspense } from 'react'
@@ -293,7 +293,7 @@ function ReadPageContent() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [targetLanguage, params, showPanel]);
+  }, [targetLanguage, params, showPanel, savedData]);
 
   const refreshPanelState = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -613,6 +613,7 @@ function ReadPageContent() {
         {/* Sliding Panel */}
         {showPanel && (
           <TranslationPanel
+            currentUrl={reconstructUrl(params.url as string | string[]) || ''}
             translations={currentTranslations}
             targetLanguage={targetLanguage}
             onClose={() => setShowPanel(false)}
@@ -637,14 +638,31 @@ function ReadPageContent() {
                         'AI Explanation'}
                 </span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 -mt-1 -mr-1 rounded-full text-muted-foreground hover:bg-muted"
-                onClick={() => setExplanationData(null)}
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {explanationResult && !explanationLoading && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 -mt-1 rounded-full text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+                    onClick={() => {
+                      import('@/lib/tts').then(({ playTextToSpeech }) => {
+                        playTextToSpeech(explanationResult, 'en-US');
+                      });
+                    }}
+                    title="Listen"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 -mt-1 -mr-1 rounded-full text-muted-foreground hover:bg-muted"
+                  onClick={() => setExplanationData(null)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
 
             <div className="bg-muted/50 rounded-lg p-2.5 mb-3 border border-border/50">
