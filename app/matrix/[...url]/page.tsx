@@ -5,11 +5,12 @@ import { translateMarkdown } from '@/app/actions/translate'
 import LanguageSelector from '@/components/LanguageSelector'
 import { Button } from '@/components/ui/button'
 import { reconstructUrl } from '@/lib/utils'
-import { ArrowLeft, ArrowRight, RotateCw, X, Wand2, LayoutTemplate, MousePointerSquareDashed } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Wand2, LayoutTemplate, MousePointerSquareDashed, ExternalLink, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { Lock as LockIcon } from 'lucide-react'
+import Squares from '@/components/react-bits/Squares'
 
 export default function MatrixPage() {
     const params = useParams()
@@ -116,6 +117,21 @@ export default function MatrixPage() {
                     setTranslating(false);
                 }
             }
+
+            if (type === 'JSON_DOWNLOAD_READY') {
+                const { payload, language } = event.data;
+                if (!payload || Object.keys(payload).length === 0) {
+                    alert('No translations to download yet!');
+                    return;
+                }
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `${language}-translations.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            }
         };
 
         window.addEventListener('message', handleMessage);
@@ -141,9 +157,15 @@ export default function MatrixPage() {
 
     return (
         <div className="h-screen flex flex-col overflow-hidden relative bg-[#0a0a0a]">
-            {/* Animated Background Mesh */}
+            {/* Animated Background Mesh (React Bits) */}
             <div className="absolute inset-0 z-0 pointer-events-none opacity-50">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+                <Squares
+                    speed={0.5}
+                    squareSize={40}
+                    direction="diagonal"
+                    borderColor="rgba(255,255,255,0.03)"
+                    hoverFillColor="rgba(255,255,255,0.06)"
+                />
             </div>
 
             {/* Floating Browser Island */}
@@ -247,44 +269,132 @@ export default function MatrixPage() {
             {/* Grid Viewport */}
             <main className="flex-1 relative w-full h-full p-2">
                 <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-2">
-                    {[0, 1, 2, 3].map((index) => {
-                        const lang = matrixLanguages[index];
-                        return (
-                            <div key={index} className="relative h-full bg-card md:rounded-xl md:border border-border/40 shadow-xl overflow-hidden ring-1 ring-border/10 group">
-                                {/* Language Overlay */}
-                                <div className="absolute top-2 right-4 z-40 shadow-lg border border-border/50 rounded-full bg-background/80 backdrop-blur-md opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <LanguageSelector
-                                        selectedLanguage={lang}
-                                        onLanguageChange={(newLang) => {
-                                            if (newLang) {
-                                                const newMatrix = [...matrixLanguages];
-                                                newMatrix[index] = newLang;
-                                                setMatrixLanguages(newMatrix);
-                                                iframeRefs.current[index]?.contentWindow?.postMessage({ type: 'LANGUAGE_UPDATE' }, '*');
-                                            }
-                                        }}
-                                    />
-                                </div>
-
-                                <iframe
-                                    ref={(el) => { iframeRefs.current[index] = el; }}
-                                    src={proxyUrl}
-                                    className="w-full h-full border-0 select-none pb-12 md:pb-0"
-                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                                    title={`Matrix Proxy ${index}`}
-                                    onLoad={() => setIframesLoaded(prev => prev + 1)}
-                                />
-
-                                {iframesLoaded <= index && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-card z-10">
-                                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                    {[0, 1, 2, 3].map((index) => (
+                        <MatrixCell
+                            key={index}
+                            index={index}
+                            proxyUrl={proxyUrl}
+                            originalUrl={params.url}
+                            matrixLanguages={matrixLanguages}
+                            setMatrixLanguages={setMatrixLanguages}
+                            iframeRefs={iframeRefs}
+                            iframesLoaded={iframesLoaded}
+                            setIframesLoaded={setIframesLoaded}
+                            router={router}
+                        />
+                    ))}
                 </div>
             </main>
         </div>
     )
+}
+
+function MatrixCell({ index, proxyUrl, originalUrl, matrixLanguages, setMatrixLanguages, iframeRefs, iframesLoaded, setIframesLoaded, router }: any) {
+    const lang = matrixLanguages[index];
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+    const VIRTUAL_WIDTH = 1440; // Desktop width
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const observer = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                setDimensions({
+                    width: entry.contentRect.width,
+                    height: entry.contentRect.height,
+                });
+            }
+        });
+
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, []);
+
+    const scale = dimensions.width > 0 ? dimensions.width / VIRTUAL_WIDTH : 1;
+    const virtualHeight = dimensions.width > 0 ? dimensions.height / scale : 1080;
+
+    return (
+        <div
+            className="relative h-full w-full bg-card md:rounded-xl md:border border-border/40 shadow-xl overflow-hidden ring-1 ring-border/10 group flex items-center justify-center"
+        >
+            {/* Language Overlay & Actions */}
+            <div className="absolute top-2 right-4 z-40 shadow-lg border border-border/50 rounded-full bg-background/80 backdrop-blur-md opacity-50 group-hover:opacity-100 transition-opacity flex items-center pr-1 overflow-hidden">
+                <LanguageSelector
+                    selectedLanguage={lang}
+                    onLanguageChange={(newLang) => {
+                        if (newLang) {
+                            const newMatrix = [...matrixLanguages];
+                            newMatrix[index] = newLang;
+                            setMatrixLanguages(newMatrix);
+                            iframeRefs.current[index]?.contentWindow?.postMessage({ type: 'LANGUAGE_UPDATE' }, '*');
+                        }
+                    }}
+                />
+
+                <div className="flex items-center gap-1 border-l border-border/50 pl-1 mx-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 hover:text-primary transition-colors text-muted-foreground"
+                        title="Download Translations JSON"
+                        onClick={() => {
+                            iframeRefs.current[index]?.contentWindow?.postMessage({
+                                type: 'REQUEST_JSON_DOWNLOAD',
+                                language: lang
+                            }, '*');
+                        }}
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-7 h-7 rounded-full hover:bg-primary/20 hover:text-primary transition-colors text-muted-foreground"
+                        title="Open in Single Read Mode"
+                        onClick={() => {
+                            const urlToLoad = reconstructUrl(originalUrl as string | string[]) || '';
+                            router.push(`/read/${encodeURIComponent(urlToLoad)}?lang=${lang}`);
+                        }}
+                    >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                </div>
+            </div>
+
+            {/* Responsive Virtual Viewport via React Bounds */}
+            <div
+                ref={containerRef}
+                className="w-full h-full relative bg-[#0a0a0a]/50 shrink-0 overflow-hidden"
+            >
+                {dimensions.width > 0 && (
+                    <div
+                        className="absolute bg-white shadow-xl ring-1 ring-border/10 overflow-hidden origin-top-left"
+                        style={{
+                            width: `${VIRTUAL_WIDTH}px`,
+                            height: `${virtualHeight}px`,
+                            transform: `scale(${scale})`
+                        }}
+                    >
+                        <iframe
+                            ref={(el) => { iframeRefs.current[index] = el; }}
+                            src={proxyUrl}
+                            className="w-full h-full border-0 select-none pb-12 md:pb-0 bg-white"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                            title={`Matrix Proxy ${index}`}
+                            onLoad={() => setIframesLoaded((prev: number) => prev + 1)}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {iframesLoaded <= index && (
+                <div className="absolute inset-0 flex items-center justify-center bg-card/50 backdrop-blur-sm z-10 rounded-xl">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+            )}
+        </div>
+    );
 }

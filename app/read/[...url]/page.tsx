@@ -6,33 +6,44 @@ import LanguageSelector from '@/components/LanguageSelector'
 import { Button } from '@/components/ui/button'
 import { reconstructUrl } from '@/lib/utils'
 import TranslationPanel from '@/components/TranslationPanel' // Import component
-import { getSavedPage, savePage, addVocabulary, type SavedPage, type TranslationEntry } from '@/lib/library' // Import library types
+import { type SavedPage, type TranslationEntry } from '@/lib/library' // Import legacy library types
+import { useSavePage, useSavedPage, useAddVocabulary } from '@/lib/hooks/useLibrary'
 import { explainText } from '@/app/actions/explain' // Import explanation action
 import { ArrowLeft, ArrowRight, Lock as LockIcon, RotateCw, X, Wand2, Save, Bookmark, BookOpen, LayoutTemplate, LayoutGrid, PanelsTopLeft, MousePointerSquareDashed } from 'lucide-react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useRef, useState, Suspense } from 'react'
 
-export default function ReadPage() {
+function ReadPageContent() {
   const [params, setParams] = useState<any>(useParams())
+  const searchParams = useSearchParams()
   const router = useRouter()
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [targetLanguage, setTargetLanguage] = useState<string>('es') // Default to Spanish
+
+  // Initialize target language from query parameter ?lang=es or default to 'es'
+  const initialLang = searchParams?.get('lang') || 'es'
+  const [targetLanguage, setTargetLanguage] = useState<string>(initialLang)
+
   const [translating, setTranslating] = useState(false)
   const [isMarqueeActive, setIsMarqueeActive] = useState(false)
   const [proxyUrl, setProxyUrl] = useState<string | null>(null)
   const [iframeLoaded, setIframeLoaded] = useState(false)
-  const [isSaved, setIsSaved] = useState(false) // Track saved state
+
+  const decodedUrlMemo = reconstructUrl(params.url as string | string[]) || "";
+  const { data: savedData } = useSavedPage(decodedUrlMemo, targetLanguage);
+  const saveMutation = useSavePage();
+  const addVocabMutation = useAddVocabulary();
+  const isSaved = !!savedData; // Track saved state from react query
 
   // New State for Panel
   const [showPanel, setShowPanel] = useState(false) // Toggle panel
   const [currentTranslations, setCurrentTranslations] = useState<Record<string, TranslationEntry>>({}) // Track translations in real-time
 
   // Explanation State
-  const [explanationData, setExplanationData] = useState<{ selectedText: string, surroundingText: string } | null>(null);
+  const [explanationData, setExplanationData] = useState<{ selectedText: string, surroundingText: string, type?: string } | null>(null);
   const [explanationLoading, setExplanationLoading] = useState(false);
   const [explanationResult, setExplanationResult] = useState("");
 
@@ -53,10 +64,6 @@ export default function ReadPage() {
           return;
         }
 
-        // Check if page is saved in library
-        const saved = getSavedPage(decodedUrl, targetLanguage);
-        if (saved) setIsSaved(true);
-
         // Construct proxy URL
         const pUrl = `/api/proxy?url=${encodeURIComponent(decodedUrl)}`
         setProxyUrl(pUrl)
@@ -68,26 +75,29 @@ export default function ReadPage() {
       }
     }
     init()
-  }, [params, targetLanguage])
+  }, [params])
 
-  // Restore state when iframe loads if saved
+  // Restore state when iframe loads if saved, or natively auto translate if initially specified by lang
   useEffect(() => {
     if (iframeLoaded && proxyUrl && params?.url) {
-      const decodedUrl = reconstructUrl(params.url as string | string[]);
-      if (decodedUrl) {
-        const saved = getSavedPage(decodedUrl, targetLanguage);
-        if (saved && saved.translations && iframeRef.current && iframeRef.current.contentWindow) {
-          console.log("Restoring saved translations...");
-          setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage({
-              type: 'RESTORE_PAGE_STATE',
-              translations: saved.translations
-            }, '*');
-          }, 1000); // Small delay to ensure script initialization
-        }
+      if (savedData && savedData.translations && iframeRef.current && iframeRef.current.contentWindow) {
+        console.log("Restoring saved translations...");
+        setTimeout(() => {
+          iframeRef.current?.contentWindow?.postMessage({
+            type: 'RESTORE_PAGE_STATE',
+            translations: savedData.translations
+          }, '*');
+        }, 1000); // Small delay to ensure script initialization
+      } else if (searchParams?.get('lang') && !savedData) {
+        // If passing a lang query parameter dynamically and it isn't saved, auto-translate immediately
+        setTimeout(() => {
+          iframeRef.current?.contentWindow?.postMessage({
+            type: 'TRIGGER_BATCH_TRANSLATE'
+          }, '*');
+        }, 1000);
       }
     }
-  }, [iframeLoaded, proxyUrl, params, targetLanguage]);
+  }, [iframeLoaded, proxyUrl, params, targetLanguage, savedData, searchParams]);
 
 
   // Handle messages from iframe (Extended)
@@ -105,22 +115,19 @@ export default function ReadPage() {
         // Update local state for panel
         setCurrentTranslations(translations);
 
-        // ... existing logic to save to local storage if user requested save ...
         const decodedUrl = reconstructUrl(params.url as string | string[]);
 
         if (decodedUrl && translations && Object.keys(translations).length > 0) {
           const newPage: SavedPage = {
-            id: Date.now().toString(), // Simple ID
+            id: savedData?.id || Date.now().toString(), // Use existing ID if already saved
             url: decodedUrl,
             title: title || decodedUrl,
             targetLanguage,
-            createdAt: Date.now(),
+            createdAt: savedData?.createdAt || Date.now(),
             lastVisited: Date.now(),
             translations
           };
-          savePage(newPage);
-          setIsSaved(true);
-          // Optional: Show toast
+          saveMutation.mutate(newPage);
         }
       }
 
@@ -144,27 +151,6 @@ export default function ReadPage() {
               }, '*');
             }
 
-            // --- Auto-Fetch Explanation ---
-            const pageUrl = reconstructUrl(params.url as string | string[]) || "";
-            // Run asynchronously without blocking the main thread
-            explainText({
-              selectedText: result.data, // Explaining the translated text
-              surroundingText: result.data,
-              pageUrl,
-              pageTitle: document.title
-            }).then(explainResult => {
-              if (explainResult.success && explainResult.explanation) {
-                addVocabulary({
-                  original: text,
-                  translated: result.data!,
-                  explanation: explainResult.explanation,
-                  url: pageUrl,
-                  targetLanguage
-                });
-              }
-            }).catch(e => console.error("Auto-explain failed", e));
-            // -----------------------------
-
           } else {
             if (iframeRef.current && iframeRef.current.contentWindow) {
               iframeRef.current.contentWindow.postMessage({ type: 'TRANSLATION_RESULT', id, success: false }, '*');
@@ -175,7 +161,7 @@ export default function ReadPage() {
         } finally {
           setTranslating(false);
         }
-        if (event.data.success && showPanel) refreshPanelState();
+        refreshPanelState();
       }
 
       // Batch Translation
@@ -210,7 +196,7 @@ export default function ReadPage() {
       }
 
       if (type === 'BATCH_TRANSLATE_RESPONSE') {
-        if (showPanel) refreshPanelState();
+        refreshPanelState();
       }
 
 
@@ -219,32 +205,60 @@ export default function ReadPage() {
         // Could show a toast or notification here
       }
 
-      // Explain Request
-      if (type === 'EXPLAIN_REQUEST') {
+      // Explain, Summarize, Simplify, Meaning Requests
+      if (type === 'EXPLAIN_REQUEST' || type === 'SUMMARIZE_REQUEST' || type === 'SIMPLIFY_REQUEST' || type === 'MEANING_REQUEST') {
         const { selectedText, surroundingText } = event.data;
         if (selectedText) {
-          setExplanationData({ selectedText, surroundingText });
+          setExplanationData({ selectedText, surroundingText, type });
           setExplanationLoading(true);
           setExplanationResult(""); // Clear previous
 
-          const pageTitle = document.title;
+          const pageTitle = event.data.pageTitle || savedData?.title || decodedUrlMemo || "";
           const pageUrl = reconstructUrl(params.url as string | string[]) || "";
 
           try {
-            const response = await explainText({
-              selectedText,
-              surroundingText,
-              pageUrl,
-              pageTitle
-            });
-
-            if (response.success && response.explanation) {
-              setExplanationResult(response.explanation);
-            } else {
-              setExplanationResult(response.error || "Could not generate explanation.");
+            let response;
+            if (type === 'EXPLAIN_REQUEST') {
+              response = await explainText({ selectedText, surroundingText, pageUrl, pageTitle });
+              if (response.success && response.explanation) {
+                setExplanationResult(response.explanation);
+                addVocabMutation.mutate({
+                  original: selectedText,
+                  translated: selectedText,
+                  explanation: response.explanation,
+                  url: pageUrl,
+                  targetLanguage
+                });
+              } else {
+                setExplanationResult(response.error || "Could not generate explanation.");
+              }
+            } else if (type === 'SUMMARIZE_REQUEST') {
+              const { summarizeText } = await import('@/app/actions/summarize');
+              response = await summarizeText({ selectedText, surroundingText, pageUrl, pageTitle });
+              if (response.success && response.summary) {
+                setExplanationResult(response.summary);
+              } else {
+                setExplanationResult(response.error || "Could not generate summary.");
+              }
+            } else if (type === 'SIMPLIFY_REQUEST') {
+              const { simplifyText } = await import('@/app/actions/simplify');
+              response = await simplifyText({ selectedText, surroundingText, pageUrl, pageTitle });
+              if (response.success && response.simplification) {
+                setExplanationResult(response.simplification);
+              } else {
+                setExplanationResult(response.error || "Could not generate simplification.");
+              }
+            } else if (type === 'MEANING_REQUEST') {
+              const { meaningText } = await import('@/app/actions/meaning');
+              response = await meaningText({ selectedText, surroundingText, pageUrl, pageTitle });
+              if (response.success && response.meaning) {
+                setExplanationResult(response.meaning);
+              } else {
+                setExplanationResult(response.error || "Could not generate meaning.");
+              }
             }
           } catch (e) {
-            setExplanationResult("Error generating explanation.");
+            setExplanationResult("Error generating result.");
           } finally {
             setExplanationLoading(false);
           }
@@ -290,13 +304,6 @@ export default function ReadPage() {
   const handleLanguageChange = (lang: string | null) => {
     if (lang) {
       setTargetLanguage(lang);
-      setIsSaved(false); // Reset saved state on language change
-      // Notify iframe to re-translate currently translated items
-      if (iframeRef.current && iframeRef.current.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({
-          type: 'LANGUAGE_UPDATE'
-        }, '*');
-      }
     }
   }
 
@@ -374,12 +381,12 @@ export default function ReadPage() {
     }
   }
 
-  const handlePanelExplain = async (id: string, text: string) => {
-    setExplanationData({ selectedText: text, surroundingText: text });
+  const handlePanelExplain = async (id: string, text: string, originalText: string) => {
+    setExplanationData({ selectedText: text, surroundingText: text, type: 'EXPLAIN_REQUEST' });
     setExplanationLoading(true);
     setExplanationResult("");
 
-    const pageTitle = document.title;
+    const pageTitle = savedData?.title || decodedUrlMemo || "";
     const pageUrl = reconstructUrl(params.url as string | string[]) || "";
 
     try {
@@ -392,6 +399,13 @@ export default function ReadPage() {
 
       if (response.success && response.explanation) {
         setExplanationResult(response.explanation);
+        addVocabMutation.mutate({
+          original: originalText,
+          translated: text,
+          explanation: response.explanation,
+          url: pageUrl,
+          targetLanguage
+        });
       } else {
         setExplanationResult(response.error || "Could not generate explanation.");
       }
@@ -507,27 +521,7 @@ export default function ReadPage() {
               <LayoutGrid className="w-4 h-4" />
             </Button>
 
-            {/* Bookmark / Save Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ${isSaved ? 'text-primary bg-primary/10' : 'hover:bg-primary/10 hover:text-primary'}`}
-              onClick={handleSavePage}
-              title={isSaved ? "Translation Saved" : "Save Translation"}
-            >
-              {isSaved ? <Bookmark className="w-4 h-4 fill-current" /> : <Save className="w-4 h-4" />}
-            </Button>
 
-            {/* Vocabulary / Flashcards */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 hover:bg-primary/10 hover:text-primary rounded-full transition-all duration-200 hover:scale-110 active:scale-95"
-              onClick={() => router.push('/vocabulary')}
-              title="Vocabulary List"
-            >
-              <BookOpen className="w-4 h-4" />
-            </Button>
 
             <div className="hidden md:block w-px h-4 bg-border mx-1" />
 
@@ -604,17 +598,6 @@ export default function ReadPage() {
               </div>
             </div>
           )}
-          {/* Animated Onboarding Hint */}
-          {iframeLoaded && Object.keys(currentTranslations).length === 0 && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-in fade-in slide-in-from-top-4 duration-1000 delay-500">
-              <div className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-full font-medium shadow-[0_8px_32px_0_rgba(31,38,135,0.2)] flex items-center gap-3 ring-2 ring-primary/30 ring-offset-2 ring-offset-background transition-all">
-                <Wand2 className="w-4 h-4 animate-pulse" />
-                <span className="text-sm">Click the <b>Magic Wand</b> or hover over text to translate</span>
-              </div>
-              {/* Pointer line pointing up towards the toolbar */}
-              <div className="w-px h-12 bg-gradient-to-t from-transparent to-primary/50 -mt-16 -order-1 mb-2" />
-            </div>
-          )}
 
           <iframe
             ref={iframeRef}
@@ -647,7 +630,12 @@ export default function ReadPage() {
             <div className="flex justify-between items-start mb-3">
               <div className="flex items-center gap-2 text-primary font-semibold">
                 <span className="text-xl">✨</span>
-                <span className="text-sm">AI Explanation</span>
+                <span className="text-sm">
+                  {explanationData.type === 'SUMMARIZE_REQUEST' ? 'AI Summary' :
+                    explanationData.type === 'SIMPLIFY_REQUEST' ? 'AI Simplify' :
+                      explanationData.type === 'MEANING_REQUEST' ? 'AI Meaning' :
+                        'AI Explanation'}
+                </span>
               </div>
               <Button
                 variant="ghost"
@@ -679,5 +667,17 @@ export default function ReadPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function ReadPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen w-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ReadPageContent />
+    </Suspense>
   )
 }

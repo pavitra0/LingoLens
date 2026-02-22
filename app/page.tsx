@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Globe, Layout, Sparkles, BookOpen, PanelsTopLeft, MousePointerSquareDashed, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Squares from "@/components/react-bits/Squares";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -21,23 +22,21 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-foreground relative overflow-hidden bg-[#0A0A0A]">
+    <div className="min-h-screen flex flex-col text-foreground relative overflow-x-hidden bg-[#0A0A0A]">
 
-      {/* Animated Background Mesh & Grid */}
+      {/* Animated Background Mesh & Grid (React Bits) */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+        <Squares
+          speed={0.5}
+          squareSize={40}
+          direction="diagonal"
+          borderColor="rgba(255,255,255,0.03)"
+          hoverFillColor="rgba(255,255,255,0.06)"
+        />
+        <div className="absolute top-0 left-0 right-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
       </div>
 
-      {/* Header */}
-      <header className="absolute top-0 w-full p-6 flex justify-end z-20">
-        <Button variant="outline" className="bg-white/5 backdrop-blur-xl hover:bg-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.1)] border-white/10 text-foreground transition-all duration-300" onClick={() => router.push('/vocabulary')}>
-          <BookOpen className="w-4 h-4 mr-2 text-primary" />
-          Vocabulary
-        </Button>
-      </header>
-
-      <main className="w-full max-w-5xl px-6 flex flex-col items-center text-center z-10 space-y-16 mt-16">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-6 flex flex-col items-center justify-center text-center z-10 space-y-16 py-20 pb-24">
         {/* Hero Section */}
         <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold uppercase tracking-widest text-primary mb-8 shadow-[0_0_20px_rgba(var(--primary),0.2)]">

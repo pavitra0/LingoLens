@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Personal notes & drafts
+article.md
+core-for-article.md
+demo-script.md
+elevenlabs-voiceover.txt
+voiceover-script.txt
+ 
+# Debug/test scripts
+scripts/test-chat.js
+scripts/test-chat2.js

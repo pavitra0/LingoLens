@@ -20,6 +20,7 @@ import {
     Download
 } from 'lucide-react'
 import { TranslationEntry } from '@/lib/library'
+import { useVocabularyList, useDeleteVocabulary } from '@/lib/hooks/useLibrary'
 import { playTextToSpeech } from '@/lib/tts'
 
 interface TranslationPanelProps {
@@ -30,7 +31,7 @@ interface TranslationPanelProps {
     onLock: (id: string, locked: boolean) => void;
     onHighlight: (id: string) => void;
     onRevert: (id: string) => void;
-    onExplain: (id: string, text: string) => void;
+    onExplain: (id: string, text: string, original: string) => void;
 }
 
 export default function TranslationPanel({
@@ -43,10 +44,14 @@ export default function TranslationPanel({
     onRevert,
     onExplain
 }: TranslationPanelProps) {
+    const [activeTab, setActiveTab] = useState<'translations' | 'vocabulary'>('translations')
     const [search, setSearch] = useState('')
     const [filter, setFilter] = useState<'all' | 'locked' | 'modified' | 'errors'>('all')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
+
+    const { data: vocabList = [] } = useVocabularyList();
+    const deleteVocabMutation = useDeleteVocabulary();
 
     const entries = useMemo(() => Object.entries(translations), [translations])
 
@@ -179,129 +184,212 @@ export default function TranslationPanel({
                 </div>
             </div>
 
-            {/* List */}
+            {/* Tabs Header */}
+            <div className="flex border-b border-border/10 bg-black/10">
+                <button
+                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'translations' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
+                    onClick={() => setActiveTab('translations')}
+                >
+                    Translations
+                </button>
+                <button
+                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 flex items-center justify-center gap-1.5 ${activeTab === 'vocabulary' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
+                    onClick={() => setActiveTab('vocabulary')}
+                >
+                    Vocabulary
+                    {vocabList.length > 0 && (
+                        <Badge variant="secondary" className="px-1.5 h-4 text-[10px] bg-primary/20 text-primary border-none">
+                            {vocabList.length}
+                        </Badge>
+                    )}
+                </button>
+            </div>
+
+            {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {filteredEntries.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground">
-                        <p>No translations found</p>
-                    </div>
-                ) : (
-                    filteredEntries.map(([id, entry]) => (
-                        <div
-                            key={id}
-                            className={`
+                {activeTab === 'translations' ? (
+                    filteredEntries.length === 0 ? (
+                        <div className="text-center py-10 text-muted-foreground">
+                            <p>No translations found</p>
+                        </div>
+                    ) : (
+                        filteredEntries.map(([id, entry]) => (
+                            <div
+                                key={id}
+                                className={`
                 group relative border rounded-lg p-3 transition-all hover:shadow-md
                 ${entry.isLocked ? 'border-amber-500/30 bg-amber-500/5' : 'border-border bg-card'}
               `}
-                        >
-                            <div className="flex justify-between items-start gap-2 mb-2">
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono uppercase text-muted-foreground">
-                                        {entry.elementTag}
-                                    </Badge>
-                                    {entry.layoutError && (
-                                        <Badge variant="destructive" className="text-[10px] h-5 px-1.5 flex gap-1 items-center animate-in fade-in zoom-in">
-                                            <AlertTriangle className="w-3 h-3" />
-                                            {entry.errorType || 'Layout Break'}
+                            >
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono uppercase text-muted-foreground">
+                                            {entry.elementTag}
                                         </Badge>
-                                    )}
+                                        {entry.layoutError && (
+                                            <Badge variant="destructive" className="text-[10px] h-5 px-1.5 flex gap-1 items-center animate-in fade-in zoom-in">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                {entry.errorType || 'Layout Break'}
+                                            </Badge>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-1 opacity-100 transition-opacity">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 hover:text-primary"
+                                            onClick={() => onHighlight(id)}
+                                            title="Highlight on page"
+                                        >
+                                            <Eye className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className={`h-6 w-6 ${entry.isLocked ? 'text-amber-500' : 'text-muted-foreground hover:text-amber-500'}`}
+                                            onClick={() => onLock(id, !entry.isLocked)}
+                                            title={entry.isLocked ? "Unlock" : "Lock"}
+                                        >
+                                            {entry.isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                        </Button>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center gap-1 opacity-100 transition-opacity">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 hover:text-primary"
-                                        onClick={() => onHighlight(id)}
-                                        title="Highlight on page"
-                                    >
-                                        <Eye className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`h-6 w-6 ${entry.isLocked ? 'text-amber-500' : 'text-muted-foreground hover:text-amber-500'}`}
-                                        onClick={() => onLock(id, !entry.isLocked)}
-                                        title={entry.isLocked ? "Unlock" : "Lock"}
-                                    >
-                                        {entry.isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                                    </Button>
+                                {/* Original */}
+                                <div className="text-xs text-muted-foreground mb-1.5 line-clamp-2" title={entry.original}>
+                                    {entry.original}
                                 </div>
-                            </div>
 
-                            {/* Original */}
-                            <div className="text-xs text-muted-foreground mb-1.5 line-clamp-2" title={entry.original}>
-                                {entry.original}
-                            </div>
+                                {/* Translated (Editable) */}
+                                {editingId === id ? (
+                                    <div className="flex gap-2 items-center">
+                                        <Input
+                                            value={editText}
+                                            onChange={(e) => setEditText(e.target.value)}
+                                            className="h-8 text-sm"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') saveEdit(id);
+                                                if (e.key === 'Escape') setEditingId(null);
+                                            }}
+                                        />
+                                        <Button size="icon" className="h-8 w-8 shrink-0" onClick={() => saveEdit(id)}>
+                                            <Check className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-between items-start gap-2 group/text">
+                                        <p
+                                            className={`text-sm font-medium leading-relaxed ${entry.status === 'modified' ? 'text-blue-500' : 'text-foreground'}`}
+                                        >
+                                            {entry.translated}
+                                        </p>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 shrink-0 opacity-0 group-hover/text:opacity-100 -mt-1"
+                                            onClick={() => startEditing(id, entry.translated)}
+                                        >
+                                            <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                )}
 
-                            {/* Translated (Editable) */}
-                            {editingId === id ? (
-                                <div className="flex gap-2 items-center">
-                                    <Input
-                                        value={editText}
-                                        onChange={(e) => setEditText(e.target.value)}
-                                        className="h-8 text-sm"
-                                        autoFocus
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') saveEdit(id);
-                                            if (e.key === 'Escape') setEditingId(null);
-                                        }}
-                                    />
-                                    <Button size="icon" className="h-8 w-8 shrink-0" onClick={() => saveEdit(id)}>
-                                        <Check className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex justify-between items-start gap-2 group/text">
-                                    <p
-                                        className={`text-sm font-medium leading-relaxed ${entry.status === 'modified' ? 'text-blue-500' : 'text-foreground'}`}
-                                    >
-                                        {entry.translated}
-                                    </p>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 shrink-0 opacity-0 group-hover/text:opacity-100 -mt-1"
-                                        onClick={() => startEditing(id, entry.translated)}
-                                    >
-                                        <Edit2 className="w-3 h-3" />
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Footer Actions */}
-                            <div className="mt-2 pt-2 border-t border-dashed border-border/50 flex justify-end gap-2 text-muted-foreground">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-[10px] hover:text-primary gap-1 px-2"
-                                    onClick={() => playTextToSpeech(entry.translated, targetLanguage)}
-                                >
-                                    <Volume2 className="w-3 h-3 text-blue-500" /> Listen
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-[10px] hover:text-primary gap-1 px-2"
-                                    onClick={() => onExplain(id, entry.translated)}
-                                >
-                                    <Sparkles className="w-3 h-3 text-purple-500" /> Explain
-                                </Button>
-                                {(entry.status === 'modified' || entry.original !== entry.translated) && (
+                                {/* Footer Actions */}
+                                <div className="mt-2 pt-2 border-t border-dashed border-border/50 flex justify-end gap-2 text-muted-foreground">
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="h-6 text-[10px] hover:text-destructive gap-1 px-2"
-                                        onClick={() => onRevert(id)}
+                                        className="h-6 text-[10px] hover:text-primary gap-1 px-2"
+                                        onClick={() => playTextToSpeech(entry.translated, targetLanguage)}
                                     >
-                                        <RotateCcw className="w-3 h-3" /> Revert
+                                        <Volume2 className="w-3 h-3 text-blue-500" /> Listen
                                     </Button>
-                                )}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 text-[10px] hover:text-primary gap-1 px-2"
+                                        onClick={() => onExplain(id, entry.translated, entry.original)}
+                                    >
+                                        <Sparkles className="w-3 h-3 text-purple-500" /> Explain
+                                    </Button>
+                                    {(entry.status === 'modified' || entry.original !== entry.translated) && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 text-[10px] hover:text-destructive gap-1 px-2"
+                                            onClick={() => onRevert(id)}
+                                        >
+                                            <RotateCcw className="w-3 h-3" /> Revert
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
+                        ))
+                    )
+                ) : (
+                    /* Vocabulary Tab Content */
+                    vocabList.length === 0 ? (
+                        <div className="text-center py-10 space-y-2">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <Sparkles className="w-5 h-5 text-primary/50" />
+                            </div>
+                            <p className="text-sm font-medium text-foreground">No Vocabulary Yet</p>
+                            <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
+                                Click 'Explain' on any translation to save it to your vocabulary list.
+                            </p>
                         </div>
-                    ))
+                    ) : (
+                        vocabList.map((entry) => (
+                            <div key={entry.id} className="border border-border/50 bg-card rounded-lg p-3 space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] uppercase font-mono px-1.5 h-5">
+                                            {entry.targetLanguage}
+                                        </Badge>
+                                        <p className="text-xs text-muted-foreground">{new Date(entry.timestamp).toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-primary transition-colors"
+                                            onClick={() => playTextToSpeech(entry.translated, entry.targetLanguage)}
+                                            title="Listen"
+                                        >
+                                            <Volume2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm font-semibold text-foreground">{entry.translated}</p>
+                                    <p className="text-xs text-muted-foreground mb-2">{entry.original}</p>
+                                </div>
+
+                                <div className="bg-muted/30 rounded p-2 text-xs text-foreground/80 border border-border/30">
+                                    <div className="flex items-center gap-1.5 text-purple-400 mb-1 font-medium">
+                                        <Sparkles className="w-3 h-3" />
+                                        Explanation
+                                    </div>
+                                    <p className="leading-relaxed whitespace-pre-wrap">{entry.explanation}</p>
+                                </div>
+                                <div className="flex justify-end pt-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 text-[10px] text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => deleteVocabMutation.mutate(entry.id)}
+                                    >
+                                        Delete
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )
                 )}
             </div>
-        </div>
+        </div >
     )
 }

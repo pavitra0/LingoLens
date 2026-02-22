@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/query-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,7 +35,9 @@ export default function RootLayout({
           <div className="absolute top-0 right-0 z-[-2] h-[500px] w-[500px] rounded-full bg-indigo-500/5 blur-[100px]" />
         </div>
 
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

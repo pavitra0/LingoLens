@@ -536,23 +536,7 @@
             return;
         }
 
-        if (event.data.type === 'LANGUAGE_UPDATE') {
-            document.querySelectorAll('.lingo-translated').forEach(el => {
-                const id = getUniqueId(el);
-                const original = originalTexts.get(id);
-                if (original) {
-                    el.style.opacity = '0.6';
-                    el.style.cursor = 'wait';
 
-                    window.parent.postMessage({
-                        type: 'TRANSLATE_REQUEST',
-                        text: original,
-                        id: id
-                    }, '*');
-                }
-            });
-            return;
-        }
 
         if (event.data.type === 'REQUEST_PAGE_STATE') {
             const translations = {};
@@ -574,6 +558,22 @@
                     translations,
                     title: document.title
                 }
+            }, '*');
+            return;
+        }
+
+        if (event.data.type === 'REQUEST_JSON_DOWNLOAD') {
+            const exportData = {};
+            translatedTexts.forEach((value, key) => {
+                const original = originalTexts.get(key);
+                if (original && value) {
+                    exportData[original] = value;
+                }
+            });
+            window.parent.postMessage({
+                type: 'JSON_DOWNLOAD_READY',
+                payload: exportData,
+                language: event.data.language
             }, '*');
             return;
         }
@@ -736,18 +736,29 @@
         explainButton = document.createElement('div');
         explainButton.className = 'lingo-explain-btn';
         explainButton.innerHTML = `
-            <div class="lingo-explain-content" style="display:flex;align-items:center;gap:6px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
-                    <path d="M12 2a10 10 0 0 1 10 10"></path>
-                    <path d="M12 12 2.1 12"></path>
-                </svg>
-                <span>Explain</span>
+            <div class="lingo-explain-content" style="display:flex;align-items:center;gap:4px;">
+                <button data-action="explain" class="lingo-ai-btn" title="Explain">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 2a10 10 0 0 1 10 10"></path><path d="M12 12 2.1 12"></path></svg>
+                    <span>Explain</span>
+                </button>
+                <div style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 2px;"></div>
+                <button data-action="summarize" class="lingo-ai-btn" title="Summarize">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h8"></path></svg>
+                    <span>Summarize</span>
+                </button>
+                <div style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 2px;"></div>
+                <button data-action="simplify" class="lingo-ai-btn" title="Simplify">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span>Simplify</span>
+                </button>
+                <div style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 2px;"></div>
+                <button data-action="meaning" class="lingo-ai-btn" title="Meaning">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <span>Meaning</span>
+                </button>
             </div>
-            <div class="lingo-explain-spinner" style="display:none;align-items:center;gap:6px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:lingo-spin 1s linear infinite;">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                </svg>
+            <div class="lingo-explain-spinner" style="display:none;align-items:center;gap:6px;padding:4px 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:lingo-spin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
                 <span>Thinking...</span>
             </div>
         `;
@@ -756,31 +767,47 @@
             z-index: 2147483647;
             background: #4f46e5;
             color: white;
-            padding: 8px 14px;
+            padding: 4px;
             border-radius: 99px;
-            cursor: pointer;
             font-family: system-ui, -apple-system, sans-serif;
             font-size: 13px;
             font-weight: 600;
             box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
             display: none;
             align-items: center;
-            gap: 6px;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             pointer-events: auto;
             transform-origin: center bottom;
         `;
 
-        // Add spinner animation style if not exists
-        if (!document.getElementById('lingo-spinner-style')) {
-            const spinnerStyle = document.createElement('style');
-            spinnerStyle.id = 'lingo-spinner-style';
-            spinnerStyle.textContent = `
+        // Add styles for the buttons
+        if (!document.getElementById('lingo-toolbar-style')) {
+            const style = document.createElement('style');
+            style.id = 'lingo-toolbar-style';
+            style.textContent = `
+                .lingo-ai-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: transparent;
+                    border: none;
+                    color: white;
+                    padding: 6px 12px;
+                    border-radius: 99px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: inherit;
+                    font-weight: inherit;
+                    transition: background 0.2s;
+                }
+                .lingo-ai-btn:hover {
+                    background: rgba(255, 255, 255, 0.15);
+                }
                 @keyframes lingo-spin {
                     100% { transform: rotate(360deg); }
                 }
             `;
-            document.head.appendChild(spinnerStyle);
+            document.head.appendChild(style);
         }
 
         explainButton.onmousedown = (e) => {
@@ -788,17 +815,13 @@
             e.stopPropagation();
         };
 
-        explainButton.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
+        const handleAction = (actionType) => {
             const selection = window.getSelection();
             const selectedText = selection.toString().trim();
 
             if (selectedText) {
-                console.log('[Lingo] Explain requested for:', selectedText.substring(0, 20));
+                console.log('[Lingo] ' + actionType + ' requested for:', selectedText.substring(0, 20));
 
-                // Get context
                 const anchorNode = selection.anchorNode;
                 let context = "";
                 if (anchorNode) {
@@ -814,18 +837,22 @@
                     spinnerDiv.style.display = 'flex';
                 }
 
+                let messageType = 'EXPLAIN_REQUEST';
+                if (actionType === 'summarize') messageType = 'SUMMARIZE_REQUEST';
+                if (actionType === 'simplify') messageType = 'SIMPLIFY_REQUEST';
+                if (actionType === 'meaning') messageType = 'MEANING_REQUEST';
+
                 window.parent.postMessage({
-                    type: 'EXPLAIN_REQUEST',
+                    type: messageType,
                     selectedText,
-                    surroundingText: context
+                    surroundingText: context,
+                    pageTitle: document.title
                 }, '*');
 
-                // Let it spin for a moment while the parent fetches, then hide the button and clear formatting
                 setTimeout(() => {
                     hideExplainButton();
                     window.getSelection().removeAllRanges();
 
-                    // Reset State for next time
                     if (contentDiv && spinnerDiv) {
                         contentDiv.style.display = 'flex';
                         spinnerDiv.style.display = 'none';
@@ -834,6 +861,16 @@
             } else {
                 hideExplainButton();
                 window.getSelection().removeAllRanges();
+            }
+        };
+
+        explainButton.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const btn = e.target.closest('.lingo-ai-btn');
+            if (btn) {
+                handleAction(btn.dataset.action);
             }
         };
 
@@ -855,8 +892,8 @@
         if (left < 10) left = 10;
         if (left + buttonWidth > window.innerWidth) left = window.innerWidth - buttonWidth - 10;
 
-        explainButton.style.top = `${top}px`;
-        explainButton.style.left = `${left}px`;
+        explainButton.style.top = `${top} px`;
+        explainButton.style.left = `${left} px`;
         explainButton.style.display = 'flex';
 
         // Animate in
@@ -1012,16 +1049,16 @@
             position: fixed;
             border: 2px dashed rgba(79, 70, 229, 0.8);
             background: rgba(79, 70, 229, 0.15);
-            backdrop-filter: blur(2px);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
-            z-index: 2147483647;
-            pointer-events: none;
-            left: ${startX}px;
-            top: ${startY}px;
+            backdrop - filter: blur(2px);
+            border - radius: 8px;
+            box - shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+            z - index: 2147483647;
+            pointer - events: none;
+            left: ${startX} px;
+            top: ${startY} px;
             width: 0px;
             height: 0px;
-        `;
+            `;
         document.body.appendChild(selectionBox);
     }, { capture: true });
 

@@ -1,29 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSavedPages, useDeletePage } from '@/lib/hooks/useLibrary'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { getSavedPages, deleteSavedPage, type SavedPage } from '@/lib/library'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Trash2, ExternalLink, Globe, Clock, BookOpen } from 'lucide-react'
 import { getLanguageByCode } from '@/lib/languages'
 
 export default function LibraryPage() {
-    const [pages, setPages] = useState<SavedPage[]>([])
+    const { data: pages = [], isLoading: loading } = useSavedPages()
+    const deleteMutation = useDeletePage()
     const router = useRouter()
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        setPages(getSavedPages().sort((a, b) => b.lastVisited - a.lastVisited))
-        setLoading(false)
-    }, [])
 
     const handleDelete = (id: string, e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
         if (confirm('Are you sure you want to remove this saved page?')) {
-            deleteSavedPage(id)
-            setPages(getSavedPages().sort((a, b) => b.lastVisited - a.lastVisited))
+            deleteMutation.mutate(id)
         }
     }
 
