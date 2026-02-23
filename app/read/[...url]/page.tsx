@@ -302,8 +302,14 @@ function ReadPageContent() {
   }
 
   const handleLanguageChange = (lang: string | null) => {
-    if (lang) {
+    if (lang && lang !== targetLanguage) {
       setTargetLanguage(lang);
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        // Clear locally stored translations visually if desired, though batch response will overwrite them anyway
+        iframeRef.current.contentWindow.postMessage({
+          type: 'RETRANSLATE_ACTIVE'
+        }, '*');
+      }
     }
   }
 

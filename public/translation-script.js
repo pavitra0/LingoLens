@@ -578,6 +578,30 @@
             return;
         }
 
+        if (event.data.type === 'RETRANSLATE_ACTIVE') {
+            const activeElements = [];
+            translatedTexts.forEach((value, key) => {
+                const target = getElementByUniqueId(key);
+                if (target && target.dataset.lingoState === 'translated') {
+                    const original = originalTexts.get(key);
+                    if (original) {
+                        activeElements.push({ id: key, text: original, element: target });
+                    }
+                }
+            });
+
+            if (activeElements.length > 0) {
+                activeElements.forEach(item => {
+                    item.element.classList.add('lingo-translating');
+                });
+                window.parent.postMessage({
+                    type: 'BATCH_TRANSLATE_REQUEST',
+                    payload: activeElements.map(item => ({ id: item.id, text: item.text }))
+                }, '*');
+            }
+            return;
+        }
+
         if (event.data.type === 'RESTORE_PAGE_STATE') {
             const { translations } = event.data;
             if (!translations) return;

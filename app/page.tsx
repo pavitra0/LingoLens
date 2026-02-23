@@ -5,6 +5,8 @@ import { ArrowRight, Globe, Layout, Sparkles, BookOpen, PanelsTopLeft, MousePoin
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Squares from "@/components/react-bits/Squares";
+import SplitText from "@/components/react-bits/SplitText";
+import SpotlightCard from "@/components/react-bits/SpotlightCard";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -84,7 +86,7 @@ export default function Home() {
 
           {/* Features Grid */}
           <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+            <SpotlightCard className="flex flex-col items-center gap-4 hover:-translate-y-1 transition-transform duration-300" spotlightColor="rgba(6, 182, 212, 0.15)">
               <div className="p-3 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-cyan-400 ring-1 ring-cyan-500/30">
                 <PanelsTopLeft className="w-6 h-6" />
               </div>
@@ -92,9 +94,9 @@ export default function Home() {
                 <h3 className="font-semibold text-white/90 mb-1 text-base">Matrix View</h3>
                 <p className="text-muted-foreground leading-relaxed text-xs">Test 4 languages on your UI simultaneously.</p>
               </div>
-            </div>
+            </SpotlightCard>
 
-            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+            <SpotlightCard className="flex flex-col items-center gap-4 hover:-translate-y-1 transition-transform duration-300" spotlightColor="rgba(168, 85, 247, 0.15)">
               <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-400 ring-1 ring-purple-500/30">
                 <MousePointerSquareDashed className="w-6 h-6" />
               </div>
@@ -102,9 +104,9 @@ export default function Home() {
                 <h3 className="font-semibold text-white/90 mb-1 text-base">Area Translate</h3>
                 <p className="text-muted-foreground leading-relaxed text-xs">Drag a marquee over specific components.</p>
               </div>
-            </div>
+            </SpotlightCard>
 
-            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+            <SpotlightCard className="flex flex-col items-center gap-4 hover:-translate-y-1 transition-transform duration-300" spotlightColor="rgba(245, 158, 11, 0.15)">
               <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-400 ring-1 ring-amber-500/30">
                 <Layout className="w-6 h-6" />
               </div>
@@ -112,9 +114,9 @@ export default function Home() {
                 <h3 className="font-semibold text-white/90 mb-1 text-base">Layout Inspector</h3>
                 <p className="text-muted-foreground leading-relaxed text-xs">Auto-detect broken CSS overflow & wrapping.</p>
               </div>
-            </div>
+            </SpotlightCard>
 
-            <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 shadow-xl">
+            <SpotlightCard className="flex flex-col items-center gap-4 hover:-translate-y-1 transition-transform duration-300" spotlightColor="rgba(16, 185, 129, 0.15)">
               <div className="p-3 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 text-green-400 ring-1 ring-green-500/30">
                 <Download className="w-6 h-6" />
               </div>
@@ -122,7 +124,7 @@ export default function Home() {
                 <h3 className="font-semibold text-white/90 mb-1 text-base">Locale Exporter</h3>
                 <p className="text-muted-foreground leading-relaxed text-xs">Extract fixed translations directly to JSON.</p>
               </div>
-            </div>
+            </SpotlightCard>
           </div>
         </div>
       </main>
