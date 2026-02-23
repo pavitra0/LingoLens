@@ -209,7 +209,7 @@ export default function TranslationPanel({
                     className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 flex items-center justify-center gap-1.5 ${activeTab === 'vocabulary' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
                     onClick={() => setActiveTab('vocabulary')}
                 >
-                    Vocabulary
+                    Library
                     {filteredVocabList.length > 0 && (
                         <Badge variant="secondary" className="px-1.5 h-4 text-[10px] bg-primary/20 text-primary border-none">
                             {filteredVocabList.length}

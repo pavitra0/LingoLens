@@ -11,11 +11,36 @@
     <a href="#-our-fix-lingolens">The Fix</a> •
     <a href="#-features-the-fun-part">Features</a> •
     <a href="#-the-2x2-matrix-mode-the-showstopper">Matrix Mode</a> •
+    <a href="#-article">Article</a> •
+    <a href="#-demo-video">Demo Video</a> •
     <a href="#%EF%B8%8F-the-tech-stack-nerd-corner">Tech Stack</a> •
     <a href="#-architecture-overview">Architecture</a> •
     <a href="#-wanna-try-it">Try It</a>
   </p>
 </div>
+
+---
+
+## 🎥 Demo Video
+
+▶️ **Watch the full demo:**  
+[demo.mp4](./demo.mp4)
+
+👉 **Stay till 3:11 to see Matrix Mode**, the most powerful feature of LingoLens.  
+It shows the same website translated into four languages at once and makes layout issues instantly visible.
+
+---
+
+## 📖 Article
+
+I wrote a detailed technical article explaining **why I built LingoLens**, the problems with existing translation tools, and how the system works under the hood.
+
+👉 **Read the article:**  
+
+<a href="https://dev.to/pavitra0/i-built-a-browser-inside-a-browser-and-it-translates-websites-without-breaking-a-single-pixel-4dk5">
+    <img src="https://img.shields.io/badge/dev.to-Read%20the%20Article-0A0A0A?style=for-the-badge&logo=devdotto&logoColor=white" alt="Read on Dev.to" />
+  </a>
+
 
 ---
 
