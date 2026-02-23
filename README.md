@@ -1,7 +1,4 @@
 <div align="center">
-  <br />
-  <br />
-
   <h1>🔍 LingoLens</h1>
   <p><b>Translate the Web. Preserve the Design. Don't Break Stuff.™</b></p>
   <p><i>Because Google Translate turning a beautiful website into a crime scene isn't okay anymore.</i></p>
@@ -23,8 +20,14 @@
 
 ## 🎥 Demo Video
 
-▶️ **Watch the full demo:**  
-[demo.mp4](./demo.mp4)
+▶️ **Watch the full demo:**
+
+
+
+
+https://github.com/user-attachments/assets/ad745a90-3978-4ad5-9873-260382558ad4
+
+
 
 👉 **Stay till 3:11 to see Matrix Mode**, the most powerful feature of LingoLens.  
 It shows the same website translated into four languages at once and makes layout issues instantly visible.
