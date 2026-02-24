@@ -27,6 +27,7 @@
 
 https://github.com/user-attachments/assets/ad745a90-3978-4ad5-9873-260382558ad4
 
+Watch on Youtube: https://youtu.be/-9uEMHiWlTc
 
 
 👉 **Stay till 3:11 to see Matrix Mode**, the most powerful feature of LingoLens.  
